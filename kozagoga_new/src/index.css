@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+    'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+
+  /* Основная палитра — оранжевый + серый + чёрный/белый */
+  --color-koz-50: #fff7ed;
+  --color-koz-100: #ffedd5;
+  --color-koz-200: #fed7aa;
+  --color-koz-300: #fdba74;
+  --color-koz-400: #fb923c;
+  --color-koz-500: #f97316;
+  --color-koz-600: #ea580c;
+  --color-koz-700: #c2410c;
+  --color-koz-800: #9a3412;
+  --color-koz-900: #7c2d12;
+
+  /* Системные цвета */
+  --color-background: oklch(100% 0 0);
+  --color-foreground: oklch(12% 0.01 285.75);
+  --color-card: oklch(100% 0 0);
+  --color-card-foreground: oklch(12% 0.01 285.75);
+  --color-popover: oklch(100% 0 0);
+  --color-popover-foreground: oklch(12% 0.01 285.75);
+  --color-primary: #f97316;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: oklch(96% 0.003 285.75);
+  --color-secondary-foreground: oklch(12% 0.01 285.75);
+  --color-muted: oklch(96% 0.003 285.75);
+  --color-muted-foreground: oklch(52% 0.01 285.75);
+  --color-accent: #f97316;
+  --color-accent-foreground: #ffffff;
+  --color-destructive: oklch(62% 0.22 29);
+  --color-destructive-foreground: #ffffff;
+  --color-border: oklch(91% 0.005 285.75);
+  --color-input: oklch(91% 0.005 285.75);
+  --color-ring: #f97316;
+
+  --radius: 0.625rem;
+}
+
+@theme dark {
+  --color-background: oklch(9% 0.01 285.75);
+  --color-foreground: oklch(98% 0.003 285.75);
+  --color-card: oklch(14% 0.01 285.75);
+  --color-card-foreground: oklch(98% 0.003 285.75);
+  --color-popover: oklch(14% 0.01 285.75);
+  --color-popover-foreground: oklch(98% 0.003 285.75);
+  --color-primary: #f97316;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: oklch(24% 0.01 285.75);
+  --color-secondary-foreground: oklch(98% 0.003 285.75);
+  --color-muted: oklch(24% 0.01 285.75);
+  --color-muted-foreground: oklch(68% 0.01 285.75);
+  --color-accent: #f97316;
+  --color-accent-foreground: #ffffff;
+  --color-destructive: oklch(38% 0.18 29);
+  --color-destructive-foreground: #ffffff;
+  --color-border: oklch(24% 0.01 285.75);
+  --color-input: oklch(24% 0.01 285.75);
+  --color-ring: #f97316;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Анимации */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@layer utilities {
+  .animate-fade-in-up {
+    animation: fadeInUp 0.6s ease-out forwards;
+  }
+  .animate-shimmer {
+    background: linear-gradient(90deg, transparent, rgba(0,0,0,0.05), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+}

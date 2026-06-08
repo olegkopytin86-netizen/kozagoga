@@ -1,0 +1,342 @@
+// Seed скрипт для наполнения базы данных Козагога
+// Запуск: npx tsx src/seed.ts
+import { db } from "@lork/sdk"
+
+const categories = [
+  { name: "Игры", slug: "games", description: "Цифровые версии игр, ключи и дополнения", icon: "🎮", sort_order: 1 },
+  { name: "Пополнение кошельков", slug: "top-ups", description: "Пополнение игровых кошельков и платёжных систем", icon: "💰", sort_order: 2 },
+  { name: "Подарочные карты", slug: "gift-cards", description: "Подарочные карты магазинов и сервисов", icon: "🎁", sort_order: 3 },
+  { name: "Подписки", slug: "subscriptions", description: "Подписки на сервисы и игры", icon: "📱", sort_order: 4 },
+  { name: "Аккаунты", slug: "accounts", description: "Готовые игровые аккаунты", icon: "👤", sort_order: 5 },
+  { name: "Услуги", slug: "services", description: "Цифровые услуги и бусты", icon: "⚡", sort_order: 6 },
+]
+
+const products = [
+  {
+    name: "Valorant — 1000 VP",
+    slug: "valorant-1000-vp",
+    description: "Пополнение счётчика Valorant Points на 1000 VP. Мгновенная доставка на ваш аккаунт Riot Games.",
+    short_description: "1000 VP для Valorant",
+    price: 799,
+    old_price: 899,
+    category_slug: "top-ups",
+    delivery_time: "Мгновенно",
+    region: "Россия",
+    rating: 4.8,
+    review_count: 234,
+    stock: 999,
+    is_active: true,
+    is_featured: true,
+    seller_name: "Kozagogo Official",
+    seller_verified: true,
+    features: ["1000 VP на ваш аккаунт", "Мгновенная доставка", "Работает во всех регионах", "Поддержка 24/7"],
+    faq: [
+      { question: "Как получить VP?", answer: "После оплаты укажите ваш Riot ID, и мы отправим VP в течение минуты." },
+      { question: "Работает ли в РФ?", answer: "Да, пополнение работает для аккаунтов всех регионов." },
+    ],
+    tags: ["valorant", "vp", "riot", "пополнение"],
+  },
+  {
+    name: "Steam Gift Card 500 ₽",
+    slug: "steam-gift-card-500",
+    description: "Подарочная карта Steam номиналом 500 рублей. Пополните кошелёк Steam и покупайте игры.",
+    short_description: "Подарочная карта Steam на 500 ₽",
+    price: 500,
+    old_price: null,
+    category_slug: "gift-cards",
+    delivery_time: "1–5 минут",
+    region: "Россия",
+    rating: 4.9,
+    review_count: 567,
+    stock: 500,
+    is_active: true,
+    is_featured: true,
+    seller_name: "Kozagogo Official",
+    seller_verified: true,
+    features: ["Номинал 500 ₽", "Активация в Steam", "Пополнение кошелька"],
+    faq: [
+      { question: "Как активировать?", answer: "Код придёт на email. Активируйте в клиенте Steam." },
+    ],
+    tags: ["steam", "gift card", "подарок", "игры"],
+  },
+  {
+    name: "PlayStation Plus Essential (1 месяц)",
+    slug: "ps-plus-essential-1m",
+    description: "Подписка PlayStation Plus Essential на 1 месяц. Играйте онлайн, получайте бесплатные игры каждый месяц.",
+    short_description: "PS Plus Essential на 1 месяц",
+    price: 699,
+    old_price: 799,
+    category_slug: "subscriptions",
+    delivery_time: "Мгновенно",
+    region: "Россия",
+    rating: 4.7,
+    review_count: 189,
+    stock: 300,
+    is_active: true,
+    is_featured: false,
+    seller_name: "Kozagogo Official",
+    seller_verified: true,
+    features: ["1 месяц PS Plus Essential", "Многопользовательская игра", "2 бесплатные игры в месяц"],
+    faq: [
+      { question: "Подходит для РФ аккаунта?", answer: "Да, код активируется на российском аккаунте PSN." },
+    ],
+    tags: ["playstation", "ps plus", "подписка", "sony"],
+  },
+  {
+    name: "PUBG: Battlegrounds — 1000 G-COIN",
+    slug: "pubg-1000-gcoin",
+    description: "Пополнение G-COIN в PUBG: Battlegrounds. Покупайте скины, боевые пропуски и предметы.",
+    short_description: "1000 G-COIN для PUBG",
+    price: 249,
+    old_price: null,
+    category_slug: "top-ups",
+    delivery_time: "Мгновенно",
+    region: "Россия",
+    rating: 4.6,
+    review_count: 145,
+    stock: 800,
+    is_active: true,
+    is_featured: false,
+    seller_name: "Kozagogo Official",
+    seller_verified: true,
+    features: ["1000 G-COIN", "Для PC и консолей", "Мгновенно"],
+    faq: [],
+    tags: ["pubg", "g-coin", "пополнение", "батлграунд"],
+  },
+  {
+    name: "World of Warcraft — 60 дней игрового времени",
+    slug: "wow-60-days",
+    description: "60 дней игрового времени для World of Warcraft. Продлите подписку и продолжайте приключения в Азероте.",
+    short_description: "60 дней WoW игрового времени",
+    price: 1499,
+    old_price: 1799,
+    category_slug: "subscriptions",
+    delivery_time: "1–5 минут",
+    region: "Европа",
+    rating: 4.8,
+    review_count: 98,
+    stock: 200,
+    is_active: true,
+    is_featured: false,
+    seller_name: "Kozagogo Official",
+    seller_verified: true,
+    features: ["60 дней игрового времени", "Для всех версий WoW", "Активация на Battle.net"],
+    faq: [
+      { question: "Как активировать?", answer: "Код активируется в личном кабинете Battle.net." },
+    ],
+    tags: ["wow", "world of warcraft", "подписка", "blizzard"],
+  },
+  {
+    name: "Xbox Game Pass Ultimate (1 месяц)",
+    slug: "xbox-game-pass-ultimate-1m",
+    description: "Xbox Game Pass Ultimate на 1 месяц. Доступ к сотням игр на Xbox и PC, включая EA Play.",
+    short_description: "Xbox Game Pass Ultimate на месяц",
+    price: 999,
+    old_price: null,
+    category_slug: "subscriptions",
+    delivery_time: "Мгновенно",
+    region: "Россия",
+    rating: 4.7,
+    review_count: 312,
+    stock: 400,
+    is_active: true,
+    is_featured: true,
+    seller_name: "Kozagogo Official",
+    seller_verified: true,
+    features: ["1 месяц Ultimate", "Xbox + PC", "EA Play включён"],
+    faq: [],
+    tags: ["xbox", "game pass", "microsoft", "подписка"],
+  },
+  {
+    name: "Fortnite — 1000 V-Bucks",
+    slug: "fortnite-1000-vbucks",
+    description: "1000 V-Bucks для Fortnite. Покупайте боевой пропуск, скины и эмоции.",
+    short_description: "1000 V-Bucks",
+    price: 599,
+    old_price: 699,
+    category_slug: "top-ups",
+    delivery_time: "Мгновенно",
+    region: "Россия",
+    rating: 4.5,
+    review_count: 423,
+    stock: 600,
+    is_active: true,
+    is_featured: false,
+    seller_name: "Kozagogo Official",
+    seller_verified: true,
+    features: ["1000 V-Bucks", "Для всех платформ", "Мгновенная доставка"],
+    faq: [],
+    tags: ["fortnite", "v-bucks", "пополнение", "эпик"],
+  },
+  {
+    name: "Google Play Gift Card 1000 ₽",
+    slug: "google-play-1000",
+    description: "Подарочная карта Google Play на 1000 рублей. Покупайте приложения, игры и подписки в Google Play.",
+    short_description: "Google Play на 1000 ₽",
+    price: 1000,
+    old_price: null,
+    category_slug: "gift-cards",
+    delivery_time: "1–5 минут",
+    region: "Россия",
+    rating: 4.9,
+    review_count: 876,
+    stock: 1000,
+    is_active: true,
+    is_featured: true,
+    seller_name: "Kozagogo Official",
+    seller_verified: true,
+    features: ["Номинал 1000 ₽", "Для Google Play", "Активация в приложении"],
+    faq: [
+      { question: "Как активировать?", answer: "Код придёт на email. Активируйте в Google Play." },
+    ],
+    tags: ["google play", "gift card", "подарок", "android"],
+  },
+  {
+    name: "Аккаунт Valorant (Ранг Платина)",
+    slug: "account-valorant-platinum",
+    description: "Готовый аккаунт Valorant с рангом Платина. Скины, агенты и боевой пропуск.",
+    short_description: "Аккаунт Valorant Платина",
+    price: 2499,
+    old_price: 3499,
+    category_slug: "accounts",
+    delivery_time: "5–30 минут",
+    region: "Россия",
+    rating: 4.3,
+    review_count: 67,
+    stock: 15,
+    is_active: true,
+    is_featured: false,
+    seller_name: "TopBoost",
+    seller_verified: true,
+    features: ["Ранг Платина", "Скины на 5000 VP", "Смена почты и пароля"],
+    faq: [
+      { question: "Безопасно ли покупать аккаунт?", answer: "Да, мы гарантируем смену данных и отсутствие возвратов." },
+    ],
+    tags: ["valorant", "аккаунт", "платина", "скины"],
+  },
+  {
+    name: "Буст ранга Dota 2 (1000 MMR)",
+    slug: "boost-dota-2-1000",
+    description: "Буст MMR в Dota 2 на 1000 очков. Играем с вашим аккаунтом профессиональные игроки.",
+    short_description: "+1000 MMR в Dota 2",
+    price: 1999,
+    old_price: 2499,
+    category_slug: "services",
+    delivery_time: "1–3 дня",
+    region: "Россия",
+    rating: 4.4,
+    review_count: 156,
+    stock: 50,
+    is_active: true,
+    is_featured: false,
+    seller_name: "ProBoosters",
+    seller_verified: true,
+    features: ["+1000 MMR", "Играют профессионалы", "Безопасный режим"],
+    faq: [
+      { question: "Не забанят аккаунт?", answer: "Мы используем безопасные методы. Гарантия возврата при бане." },
+    ],
+    tags: ["dota 2", "буст", "mmr", "рейтинг"],
+  },
+  {
+    name: "Telegram Premium (1 месяц)",
+    slug: "telegram-premium-1m",
+    description: "Подписка Telegram Premium на 1 месяц. Увеличенные лимиты, стикеры, реакции и многое другое.",
+    short_description: "Telegram Premium на месяц",
+    price: 299,
+    old_price: null,
+    category_slug: "subscriptions",
+    delivery_time: "Мгновенно",
+    region: "Россия",
+    rating: 4.6,
+    review_count: 234,
+    stock: 999,
+    is_active: true,
+    is_featured: false,
+    seller_name: "Kozagogo Official",
+    seller_verified: true,
+    features: ["1 месяц Premium", "4 ГБ загрузка", "Уникальные реакции"],
+    faq: [],
+    tags: ["telegram", "premium", "подписка", "мессенджер"],
+  },
+  {
+    name: "App Store & iTunes Gift Card 1000 ₽",
+    slug: "app-store-1000",
+    description: "Подарочная карта App Store и iTunes на 1000 рублей. Покупайте приложения, музыку и подписки Apple.",
+    short_description: "App Store на 1000 ₽",
+    price: 1000,
+    old_price: null,
+    category_slug: "gift-cards",
+    delivery_time: "1–5 минут",
+    region: "Россия",
+    rating: 4.8,
+    review_count: 654,
+    stock: 700,
+    is_active: true,
+    is_featured: false,
+    seller_name: "Kozagogo Official",
+    seller_verified: true,
+    features: ["Номинал 1000 ₽", "App Store и iTunes", "Активация в РФ"],
+    faq: [],
+    tags: ["app store", "apple", "gift card", "itunes"],
+  },
+]
+
+async function seed() {
+  console.log("🌱 Начинаем наполнение базы данных Козагога...")
+
+  // Создаём категории
+  for (const cat of categories) {
+    const { error } = await db.from("categories").upsert(
+      { name: cat.name, slug: cat.slug, description: cat.description, icon: cat.icon, sort_order: cat.sort_order },
+      { onConflict: "slug" }
+    )
+    if (error) {
+      console.error(`Ошибка при создании категории ${cat.name}:`, error)
+    } else {
+      console.log(`✅ Категория "${cat.name}" создана`)
+    }
+  }
+
+  // Получаем ID категорий
+  const { data: cats } = await db.from("categories").select("id, slug")
+  const catMap = new Map<string, string>()
+  cats?.forEach((c) => catMap.set(c.slug, c.id))
+
+  // Создаём товары
+  for (const prod of products) {
+    const categoryId = catMap.get(prod.category_slug || "")
+    const { error } = await db.from("products").upsert(
+      {
+        name: prod.name,
+        slug: prod.slug,
+        description: prod.description,
+        short_description: prod.short_description,
+        price: prod.price,
+        old_price: prod.old_price,
+        category_id: categoryId || null,
+        delivery_time: prod.delivery_time,
+        region: prod.region,
+        rating: prod.rating,
+        review_count: prod.review_count,
+        stock: prod.stock,
+        is_active: prod.is_active,
+        is_featured: prod.is_featured,
+        seller_name: prod.seller_name,
+        seller_verified: prod.seller_verified,
+        features: prod.features,
+        faq: prod.faq,
+        tags: prod.tags,
+      },
+      { onConflict: "slug" }
+    )
+    if (error) {
+      console.error(`Ошибка при создании товара ${prod.name}:`, error)
+    } else {
+      console.log(`✅ Товар "${prod.name}" создан`)
+    }
+  }
+
+  console.log("🎉 Наполнение базы данных завершено!")
+}
+
+seed().catch(console.error)
