@@ -30,14 +30,10 @@ const pool = new Pool({
 // ─── Инициализация модулей интеграций ──────────────────
 import { getConfig, getPollingConfig, getPaymentGatewayMapping, getRateLimits } from './lib/config-loader.js'
 import { initProviders, getProvider, listProviders } from './lib/providers/index.js'
-import YooKassaGateway from './lib/gateways/yookassa.js'
-import WalletGateway from './lib/gateways/wallet.js'
+import { initGateways, resolveGateway } from './lib/gateways/index.js'
 
-// Платежные шлюзы
-const paymentGateways = {
-  yookassa: new YooKassaGateway({ code: 'yookassa' }),
-  wallet: new WalletGateway({ code: 'wallet' }, pool),
-}
+// Платежные шлюзы (инициализация через фабрику)
+const paymentGateways = initGateways(pool)
 
 // Кэш сервисов (in-memory)
 let servicesCache = []
@@ -537,13 +533,8 @@ app.post('/api/payments/process', requireAuth, rateLimit(getRateLimits().payment
       return res.status(400).json({ error: 'Заказ уже оплачен или отменён' })
     }
 
-    // Определяем шлюз
-    const mapping = getPaymentGatewayMapping()
-    const gatewayCode = mapping[payment_method]
-    if (!gatewayCode) return res.status(400).json({ error: `Неизвестный метод оплаты: ${payment_method}` })
-
-    const gateway = paymentGateways[gatewayCode]
-    if (!gateway) return res.status(500).json({ error: `Шлюз ${gatewayCode} не настроен` })
+    // Определяем шлюз через фабрику с fallback
+    const { gateway, code: gatewayCode } = resolveGateway(payment_method, paymentGateways)
 
     const result = await gateway.createPayment({
       order_id: order.id,
@@ -569,24 +560,22 @@ app.post('/api/payments/process', requireAuth, rateLimit(getRateLimits().payment
   }
 })
 
-// FR-37: POST /api/payments/webhook — callback от платёжного шлюза
+// FR-37: POST /api/payments/webhook — callback от ЮKassa
 app.post('/api/payments/webhook', async (req, res) => {
   try {
-    // Определяем шлюз по контексту запроса
     const gateway = paymentGateways.yookassa
+    if (!gateway) return res.status(200).json({ received: true })
+
     const result = await gateway.processWebhook(req)
 
     if (result.status === 'succeeded' || result.status === 'waiting_for_capture') {
       const orderId = result.metadata?.order_id
 
       if (orderId) {
-        // Обновляем статус заказа
         await pool.query(
           `UPDATE orders SET payment_status = 'paid', status = 'paid', updated_at = now() WHERE id = $1 AND payment_status = 'pending'`,
           [orderId]
         )
-
-        // Обновляем платёж
         await pool.query(
           `UPDATE payments SET status = 'paid' WHERE gateway_tx_id = $1`,
           [result.transaction_id]
@@ -597,7 +586,44 @@ app.post('/api/payments/webhook', async (req, res) => {
     res.json({ received: true })
   } catch (err) {
     console.error('POST /api/payments/webhook error:', err)
-    res.status(200).json({ received: true }) // Всегда 200 для webhook
+    res.status(200).json({ received: true })
+  }
+})
+
+// FR-68: POST /api/payments/webhook/sberbank — уведомления от Сбербанка
+app.post('/api/payments/webhook/sberbank', async (req, res) => {
+  try {
+    const gateway = paymentGateways.sberbank
+    if (!gateway) return res.status(200).json({ received: true })
+
+    const result = await gateway.processWebhook(req)
+
+    if (result.status === 'paid') {
+      // Ищем платёж по transaction_id (sberbank orderId)
+      const payRes = await pool.query(
+        'SELECT order_id FROM payments WHERE gateway_tx_id = $1 LIMIT 1',
+        [result.transaction_id]
+      )
+
+      if (payRes.rows.length > 0) {
+        const orderId = payRes.rows[0].order_id
+
+        // Обновляем заказ
+        await pool.query(
+          `UPDATE orders SET payment_status = 'paid', status = 'paid', updated_at = now() WHERE id = $1 AND payment_status = 'pending'`,
+          [orderId]
+        )
+        await pool.query(
+          `UPDATE payments SET status = 'paid' WHERE gateway_tx_id = $1`,
+          [result.transaction_id]
+        )
+      }
+    }
+
+    res.json({ received: true })
+  } catch (err) {
+    console.error('POST /api/payments/webhook/sberbank error:', err)
+    res.status(200).json({ received: true })
   }
 })
 
@@ -647,6 +673,40 @@ app.post('/api/payments/refund', requireRole('admin'), async (req, res) => {
   } catch (err) {
     console.error('POST /api/payments/refund error:', err)
     res.status(500).json({ error: 'Ошибка возврата', details: err.message })
+  }
+})
+
+// FR-38.1: POST /api/payments/reverse — отмена неоплаченного платежа (reverse.do для Сбера)
+app.post('/api/payments/reverse', requireRole('admin'), async (req, res) => {
+  try {
+    const { order_id } = req.body
+    if (!order_id) return res.status(400).json({ error: 'order_id обязателен' })
+
+    const payRes = await pool.query(
+      'SELECT * FROM payments WHERE order_id = $1 AND status = $2 LIMIT 1',
+      [order_id, 'pending']
+    )
+    if (payRes.rows.length === 0) return res.status(400).json({ error: 'Нет неоплаченных платежей для этого заказа' })
+
+    const payment = payRes.rows[0]
+    const gateway = paymentGateways[payment.gateway]
+    if (!gateway || !gateway.reversePayment) return res.status(500).json({ error: `Шлюз ${payment.gateway} не поддерживает reverse` })
+
+    const result = await gateway.reversePayment(payment.gateway_tx_id)
+
+    await pool.query(
+      `UPDATE orders SET status = 'cancelled', updated_at = now() WHERE id = $1 AND payment_status = 'pending'`,
+      [order_id]
+    )
+    await pool.query(
+      `INSERT INTO admin_logs (admin_id, action, details) VALUES ($1, 'reverse', $2)`,
+      [req.user.id, JSON.stringify({ order_id, result })]
+    )
+
+    res.json({ result: true })
+  } catch (err) {
+    console.error('POST /api/payments/reverse error:', err)
+    res.status(500).json({ error: 'Ошибка отмены платежа', details: err.message })
   }
 })
 

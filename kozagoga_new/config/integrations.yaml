@@ -30,12 +30,18 @@ alerts:
     channels:
       - admin_dashboard
 
-# --- Маппинг платёжных шлюзов ---
+# --- Маппинг платёжных шлюзов (primary + fallback) ---
 payment_gateways:
-  card: yookassa
-  sbp: yookassa
+  card:
+    primary: sberbank
+    fallback: yookassa
+  sbp:
+    primary: sberbank
+    fallback: yookassa
   wallet: wallet
-  yoomoney: yookassa
+  yoomoney:
+    primary: sberbank
+    fallback: yookassa
 
 # --- Параметры кэша ---
 cache:
