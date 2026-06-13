@@ -2,6 +2,7 @@
 // API: POST /api/webhub/Login → token, POST /api/webhub/Process → все операции
 
 import BaseProvider from './base-provider.js'
+import ProviderLogger from './provider-logger.js'
 
 const OP_SERVICE_LIST = 'service_list_by_dealer'
 const OP_REQUISITE_ENQUIRY = 'requisite_enquiry'
@@ -17,34 +18,75 @@ export default class HyperionProvider extends BaseProvider {
     this.password = process.env.HYPERION_PASSWORD
     this.dealer = process.env.HYPERION_DEALER || 'PAO2TEST'
     this.defaultCurrency = process.env.HYPERION_CURRENCY || 'KGS'
+    this.logger = new ProviderLogger('hyperion')
+  }
+
+  /**
+   * Возвращает собранные логи для сохранения в БД
+   */
+  getLogs() {
+    return this.logger.getAll()
   }
 
   async auth() {
     if (!this.login || !this.password) {
-      throw new Error(`[hyperion] HYPERION_LOGIN и HYPERION_PASSWORD должны быть в .env`)
+      throw new Error('[hyperion] HYPERION_LOGIN и HYPERION_PASSWORD должны быть в .env')
     }
 
-    const response = await fetch(`${this.baseUrl}/Login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login: this.login, password: this.password })
-    })
+    const url = `${this.baseUrl}/Login`
+    const body = JSON.stringify({ login: this.login, password: this.password })
+    const start = Date.now()
 
-    if (!response.ok) {
-      throw new Error(`[hyperion] Auth failed: ${response.status} ${response.statusText}`)
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      })
+
+      const duration = Date.now() - start
+      const responseBody = await response.text()
+
+      this.logger.log({
+        operation: 'auth',
+        method: 'POST',
+        url,
+        requestHeaders: { 'Content-Type': 'application/json' },
+        requestBody: { login: this.login, password: '***' },
+        status: response.status,
+        responseHeaders: Object.fromEntries(response.headers.entries()),
+        responseBody: response.status === 200 ? JSON.parse(responseBody) : responseBody,
+        durationMs: duration,
+        error: response.ok ? null : `HTTP ${response.status}`,
+      })
+
+      if (!response.ok) {
+        throw new Error(`[hyperion] Auth failed: ${response.status} ${response.statusText}`)
+      }
+
+      const data = JSON.parse(responseBody)
+      this.token = data.token
+      this.tokenExpires = data.expires
+      console.log(`[hyperion] Авторизация успешна, токен до ${this.tokenExpires}`)
+    } catch (err) {
+      if (!err.message.startsWith('[hyperion]')) {
+        this.logger.logError({
+          operation: 'auth',
+          method: 'POST',
+          url,
+          requestBody: { login: this.login, password: '***' },
+          durationMs: Date.now() - start,
+          error: err.message,
+        })
+      }
+      throw err
     }
-
-    const data = await response.json()
-    this.token = data.token
-    this.tokenExpires = data.expires
-
-    console.log(`[hyperion] Авторизация успешна, токен до ${this.tokenExpires}`)
   }
 
   async _request(operation, payload = {}) {
     await this.ensureAuth()
 
-    const body = {
+    const requestBody = {
       id: crypto.randomUUID(),
       date_created: new Date().toISOString().replace('Z', '').replace('T', ' '),
       dealer: this.dealer,
@@ -53,54 +95,83 @@ export default class HyperionProvider extends BaseProvider {
       ...payload
     }
 
-    const response = await fetch(`${this.baseUrl}/Process`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.token}`
-      },
-      body: JSON.stringify(body)
-    })
+    const url = `${this.baseUrl}/Process`
+    const requestHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': '***',
+    }
 
-    if (response.status === 401) {
-      // Токен протух — пробуем переавторизоваться
-      console.log('[hyperion] Получен 401, переавторизация...')
-      this.token = null
-      await this.ensureAuth()
-      // Повторяем запрос
-      body.date_created = new Date().toISOString().replace('Z', '').replace('T', ' ')
-      const retryResponse = await fetch(`${this.baseUrl}/Process`, {
+    const start = Date.now()
+
+    const doFetch = async (token) => {
+      return fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.token}`
+          'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(requestBody),
       })
+    }
 
-      if (!retryResponse.ok) {
-        const errData = await retryResponse.json().catch(() => ({}))
-        throw new Error(`[hyperion] Request failed after reauth: ${errData.status || retryResponse.status}`)
+    try {
+      let response = await doFetch(this.token)
+      let duration = Date.now() - start
+
+      // Переавторизация при 401
+      if (response.status === 401) {
+        console.log('[hyperion] Получен 401, переавторизация...')
+        this.token = null
+        await this.ensureAuth()
+        requestBody.date_created = new Date().toISOString().replace('Z', '').replace('T', ' ')
+        response = await doFetch(this.token)
+        duration = Date.now() - start
       }
 
-      return retryResponse.json()
-    }
+      const responseBody = await response.text()
+      let parsedBody
+      try { parsedBody = JSON.parse(responseBody) } catch { parsedBody = responseBody }
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}))
-      // protocol_error
-      throw new Error(`[hyperion] ${operation} error: ${errData.status || response.status} — ${errData.details || response.statusText}`)
-    }
+      this.logger.log({
+        operation,
+        method: 'POST',
+        url,
+        requestHeaders,
+        requestBody,
+        status: response.status,
+        responseHeaders: Object.fromEntries(response.headers.entries()),
+        responseBody: parsedBody,
+        durationMs: duration,
+        error: response.ok ? null : `HTTP ${response.status}`,
+      })
 
-    return response.json()
+      if (!response.ok) {
+        const errData = typeof parsedBody === 'object' ? parsedBody : {}
+        throw new Error(
+          `[hyperion] ${operation} error: ${errData.status || response.status} — ${errData.details || response.statusText}`
+        )
+      }
+
+      return parsedBody
+    } catch (err) {
+      if (!err.message.startsWith('[hyperion]')) {
+        this.logger.logError({
+          operation,
+          method: 'POST',
+          url,
+          requestHeaders,
+          requestBody,
+          durationMs: Date.now() - start,
+          error: err.message,
+        })
+      }
+      throw err
+    }
   }
 
   async getServices() {
     const data = await this._request(OP_SERVICE_LIST)
-
-    if (data.status !== 'ok' || !data.service_list) {
-      return []
-    }
+    if (data.status !== 'ok' || !data.service_list) return []
 
     return data.service_list.map(s => ({
       id: String(s.id_service),
@@ -126,7 +197,6 @@ export default class HyperionProvider extends BaseProvider {
 
   async validate(req) {
     const info = {}
-    // Извлекаем все не-main поля в info
     if (req.params && req.fields) {
       for (const field of req.fields) {
         if (!field.is_main_requisite && req.params[field.key]) {
@@ -165,15 +235,11 @@ export default class HyperionProvider extends BaseProvider {
     }
 
     const data = await this._request(OP_PAYMENT, payload)
-
-    return {
-      package_id: data.package_id
-    }
+    return { package_id: data.package_id }
   }
 
   async status(packageId) {
     const data = await this._request(OP_STATUS, { package_id: packageId })
-
     return {
       provider_status: this.normalizeStatus(data.transaction_status || 'UNKNOWN'),
       transaction_state: data.transaction_state || '',
@@ -182,8 +248,6 @@ export default class HyperionProvider extends BaseProvider {
   }
 
   async cancel(packageId) {
-    // Hyperion использует статус cancellation, но мы для простоты проверки
-    // используем отдельный запрос
     const data = await this._request('cancellation', { package_id: packageId })
     return { result: data.status === 'ok' }
   }
@@ -196,7 +260,6 @@ export default class HyperionProvider extends BaseProvider {
     }
 
     const data = await this._request(OP_PRECHECK, payload)
-
     if (data.status !== 'ok' || !data.calculations) {
       throw new Error(`[hyperion] precheck error: ${data.status}`)
     }
