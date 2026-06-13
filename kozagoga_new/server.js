@@ -556,7 +556,7 @@ app.post('/api/payments/process', requireAuth, rateLimit(getRateLimits().payment
     // Для платежей без редиректа (кошелёк) — сразу обновляем статус заказа
     if (!result.redirect_url && result.status === 'succeeded') {
       await pool.query(
-        `UPDATE orders SET payment_status = 'paid', updated_at = now() WHERE id = $1 AND payment_status = 'pending'`,
+        `UPDATE orders SET payment_status = 'paid', status = 'paid', updated_at = now() WHERE id = $1 AND payment_status = 'pending'`,
         [order.id]
       )
     }
