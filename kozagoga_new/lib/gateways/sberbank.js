@@ -37,7 +37,7 @@ export default class SberbankGateway extends PaymentGateway {
     super(config)
     this.login = process.env.SBER_LOGIN
     this.password = process.env.SBER_PASSWORD
-    this.baseUrl = process.env.SBER_BASE_URL || 'https://ecomtest.sberbank.ru'
+    this.baseUrl = process.env.SBER_BASE_URL || 'https://ecomtest.sberbank.ru/ecomm/gw/partner/api/v1'
     this.returnUrl = process.env.SBER_RETURN_URL || 'http://localhost:5173/orders'
     this.failUrl = process.env.SBER_FAIL_URL || 'http://localhost:5173/checkout'
     this.notificationUrl = process.env.SBER_NOTIFICATION_URL || 'http://localhost:3001/api/payments/webhook/sberbank'
