@@ -48,11 +48,8 @@ export default function OrderDetail() {
     setLoading(true)
 
     try {
-      const orderRes = await db.from("orders").select("*").eq("id", id).single()
-      const itemsRes = await db.from("order_items").select("*").eq("order_id", id)
-
-      const orderData = orderRes as unknown as Order | null
-      const itemsData = itemsRes as unknown as OrderItem[]
+      const { data: orderData } = await db.from("orders").select("*").eq("id", id).single()
+      const { data: itemsData } = await db.from("order_items").select("*").eq("order_id", id)
 
       if (orderData) setOrder(orderData)
       if (itemsData) setItems(itemsData)
@@ -96,8 +93,8 @@ export default function OrderDetail() {
         }
         // Обновляем и сам заказ
         try {
-          const orderRes = await db.from("orders").select("*").eq("id", id!).single()
-          setOrder(orderRes as unknown as Order)
+          const { data: orderData } = await db.from("orders").select("*").eq("id", id!).single()
+          if (orderData) setOrder(orderData)
         } catch {
           // ignore
         }
