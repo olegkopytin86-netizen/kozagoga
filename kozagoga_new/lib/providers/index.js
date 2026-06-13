@@ -3,11 +3,12 @@
 
 import { getActiveProviders } from '../config-loader.js'
 import HyperionProvider from './hyperion-provider.js'
+import MockProvider from './mock-provider.js'
 
 // Реестр классов провайдеров
-// При добавлении нового провайдера — зарегистрировать здесь
 const PROVIDER_CLASSES = {
-  hyperion: HyperionProvider
+  hyperion: HyperionProvider,
+  mock: MockProvider
 }
 
 const instances = new Map()

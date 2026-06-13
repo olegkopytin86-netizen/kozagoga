@@ -5,9 +5,14 @@
 # --- Реестр провайдеров услуг ---
 providers:
   active:
+    - code: mock
+      class: "lib/providers/mock-provider.js"
+      enabled: true
+      label_ru: "Демо-провайдер"
+
     - code: hyperion
       class: "lib/providers/hyperion-provider.js"
-      enabled: true
+      enabled: false
       label_ru: "Hyperion"
 
     - code: paybox

@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import TrustBlock from "@/components/TrustBlock"
 import { useCart } from "@/contexts/CartContext"
 import { cn, formatPrice } from "@/lib/utils"
+import ServiceForm from "@/components/ServiceForm"
 import type { Product, ProductImage } from "@/types/database"
 
 export default function ProductDetail() {
@@ -243,44 +244,60 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            {/* Количество */}
-            <div className="mb-6 flex items-center gap-4">
-              <span className="text-sm font-medium">Количество:</span>
-              <div className="flex items-center rounded-lg border">
-                <button
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="flex h-10 w-10 items-center justify-center text-lg hover:bg-secondary transition-colors"
-                >
-                  <Minus className="h-4 w-4" />
-                </button>
-                <span className="flex h-10 w-14 items-center justify-center border-x text-sm font-medium">
-                  {quantity}
-                </span>
-                <button
-                  onClick={() => setQuantity(quantity + 1)}
-                  className="flex h-10 w-10 items-center justify-center text-lg hover:bg-secondary transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
+            {/* Для обычных товаров — количество и кнопки */}
+            {!product.provider_code ? (
+              <>
+              <div className="mb-6 flex items-center gap-4">
+                <span className="text-sm font-medium">Количество:</span>
+                <div className="flex items-center rounded-lg border">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="flex h-10 w-10 items-center justify-center text-lg hover:bg-secondary transition-colors"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <span className="flex h-10 w-14 items-center justify-center border-x text-sm font-medium">
+                    {quantity}
+                  </span>
+                  <button
+                    onClick={() => setQuantity(quantity + 1)}
+                    className="flex h-10 w-10 items-center justify-center text-lg hover:bg-secondary transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Кнопки */}
-            <div className="flex flex-wrap gap-3">
-              <Button size="lg" className="gap-2 flex-1 sm:flex-none" onClick={handleBuyNow}>
-                <Zap className="h-5 w-5" />
-                Купить сейчас
-              </Button>
-              <Button
-                variant={addedToCart ? "default" : "outline"}
-                size="lg"
-                className={cn("flex-1 sm:flex-none gap-2", addedToCart && "bg-emerald-600 hover:bg-emerald-700")}
-                onClick={handleAddToCart}
-              >
-                <ShoppingCart className="h-5 w-5" />
-                {addedToCart ? "Добавлено!" : "В корзину"}
-              </Button>
-            </div>
+              <div className="flex flex-wrap gap-3">
+                <Button size="lg" className="gap-2 flex-1 sm:flex-none" onClick={handleBuyNow}>
+                  <Zap className="h-5 w-5" />
+                  Купить сейчас
+                </Button>
+                <Button
+                  variant={addedToCart ? "default" : "outline"}
+                  size="lg"
+                  className={cn("flex-1 sm:flex-none gap-2", addedToCart && "bg-emerald-600 hover:bg-emerald-700")}
+                  onClick={handleAddToCart}
+                >
+                  <ShoppingCart className="h-5 w-5" />
+                  {addedToCart ? "Добавлено!" : "В корзину"}
+                </Button>
+              </div>
+              </>
+            ) : (
+              <div className="border rounded-xl p-5 bg-card">
+                <h3 className="font-semibold mb-4">Пополнение услуги</h3>
+                <ServiceForm
+                  product={{
+                    id: product.id,
+                    name: product.name,
+                    price: product.price,
+                    provider_code: product.provider_code || "",
+                    provider_service_id: product.provider_service_id || "",
+                  }}
+                />
+              </div>
+            )}
 
             {/* Безопасность */}
             <div className="mt-6 flex items-center gap-4 rounded-lg bg-primary/5 p-3 text-xs text-muted-foreground">
