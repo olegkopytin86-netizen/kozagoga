@@ -190,7 +190,7 @@ export default function ProductDetail() {
               <div className="mb-4 flex items-center gap-2">
                 <div className="flex items-center">
                   <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
-                  <span className="ml-1 font-semibold">{product.rating.toFixed(1)}</span>
+                  <span className="ml-1 font-semibold">{Number(product.rating || 0).toFixed(1)}</span>
                 </div>
                 <span className="text-sm text-muted-foreground">
                   ({product.review_count || 0} отзывов)

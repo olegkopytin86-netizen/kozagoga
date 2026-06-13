@@ -197,7 +197,7 @@ export default function AdminDashboard() {
                                 {product.is_active ? "Активен" : "Неактивен"}
                               </Badge>
                             </td>
-                            <td className="py-3">{product.rating?.toFixed(1) || "—"}</td>
+                            <td className="py-3">{Number(product.rating || 0).toFixed(1)}</td>
                             <td className="py-3">
                               <div className="flex gap-1">
                                 <Button variant="ghost" size="icon" className="h-8 w-8">

@@ -62,7 +62,7 @@ export default function ProductCard({ product, className }: ProductCardProps) {
           {product.rating && (
             <span className="flex items-center gap-1">
               <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-              {product.rating.toFixed(1)}
+              {Number(product.rating || 0).toFixed(1)}
             </span>
           )}
           {product.delivery_time && (

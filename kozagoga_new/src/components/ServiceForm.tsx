@@ -176,7 +176,7 @@ export default function ServiceForm({ product }: Props) {
                 setFieldValues(prev => ({ ...prev, [field.key]: e.target.value }))
                 setValidationResult(null)
               }}
-              maxLength={field.max_length}
+              maxLength={field.is_main_requisite ? undefined : field.max_length}
               className={field.keyboard === "numeric" ? "font-mono text-lg" : ""}
               inputMode={field.keyboard === "numeric" ? "numeric" : "text"}
               disabled={paying}
@@ -226,7 +226,7 @@ export default function ServiceForm({ product }: Props) {
             ? <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
             : <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
           }
-          <span>{validationResult.details}</span>
+          <span>{validationResult.details.replace(/^Code: [^;]+; \d+: /, '')}</span>
         </div>
       )}
 
