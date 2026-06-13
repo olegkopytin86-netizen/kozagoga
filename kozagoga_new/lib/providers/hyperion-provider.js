@@ -1,5 +1,5 @@
 // HyperionProvider — реализация BaseProvider для Hyperion (Кыргызстан)
-// API: POST /Login → token, POST /Process → все операции
+// API: POST /api/webhub/Login → token, POST /api/webhub/Process → все операции
 
 import BaseProvider from './base-provider.js'
 
