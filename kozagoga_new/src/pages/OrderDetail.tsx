@@ -204,7 +204,7 @@ export default function OrderDetail() {
                     </div>
                   )}
                   <Badge variant="outline" className="text-xs font-mono">
-                    ID: {order.provider_transaction_id.slice(0, 12)}...
+                    ID: {order.provider_transaction_id?.slice(0, 12) || '—'}...
                   </Badge>
                 </div>
                 {providerDesc && (
