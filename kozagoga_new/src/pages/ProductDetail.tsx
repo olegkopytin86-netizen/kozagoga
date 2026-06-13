@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import TrustBlock from "@/components/TrustBlock"
 import { useCart } from "@/contexts/CartContext"
-import { cn } from "@/lib/utils"
+import { cn, formatPrice } from "@/lib/utils"
 import type { Product, ProductImage } from "@/types/database"
 
 export default function ProductDetail() {
@@ -44,15 +44,6 @@ export default function ProductDetail() {
     }
     fetchProduct()
   }, [slug])
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("ru-RU", {
-      style: "currency",
-      currency: "RUB",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(price)
-  }
 
   const handleAddToCart = () => {
     if (!product) return

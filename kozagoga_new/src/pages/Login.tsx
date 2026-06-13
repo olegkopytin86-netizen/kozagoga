@@ -85,19 +85,11 @@ export default function Login() {
               </Link>
             </div>
 
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Демо-доступ</span>
-              </div>
-            </div>
-
             <div className="rounded-lg border bg-secondary/50 p-3 text-xs text-muted-foreground">
-              <p className="mb-1 font-medium text-foreground">Тестовые аккаунты:</p>
-              <p>Админ: admin@kozagogo.ru / admin123</p>
-              <p>Пользователь: user@kozagogo.ru / user123</p>
+              <p className="mb-1 font-medium text-foreground">Демо-доступ:</p>
+              <p>Админ: admin@kozagogo.ru</p>
+              <p>Пользователь: user@kozagogo.ru</p>
+              <p className="mt-1 text-foreground">Пароль уточните у администратора</p>
             </div>
           </form>
         </CardContent>

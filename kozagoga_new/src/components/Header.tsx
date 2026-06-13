@@ -6,16 +6,8 @@ import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/AuthContext"
 import { useCart } from "@/contexts/CartContext"
 import { db } from "@lork/sdk"
+import { defaultCategories } from "@/lib/categories"
 import type { Category } from "@/types/database"
-
-const defaultCategories = [
-  { name: "Игры", slug: "games", icon: "🎮" },
-  { name: "Пополнение кошельков", slug: "top-ups", icon: "💰" },
-  { name: "Подарочные карты", slug: "gift-cards", icon: "🎁" },
-  { name: "Подписки", slug: "subscriptions", icon: "📱" },
-  { name: "Аккаунты", slug: "accounts", icon: "👤" },
-  { name: "Услуги", slug: "services", icon: "⚡" },
-]
 
 export default function Header() {
   const { user, isAdmin, logout } = useAuth()
@@ -188,7 +180,7 @@ export default function Header() {
             )}
 
             {/* Корзина */}
-            <Link to="/checkout">
+            <Link to="/cart">
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
                 {itemCount > 0 && (
@@ -311,7 +303,7 @@ export default function Header() {
                 </Link>
               )}
               <Link
-                to="/checkout"
+                to="/cart"
                 className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
                 onClick={() => setMobileMenuOpen(false)}
               >

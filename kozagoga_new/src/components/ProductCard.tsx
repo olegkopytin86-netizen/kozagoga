@@ -1,6 +1,6 @@
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { Star, Clock, MapPin, Zap } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatPrice } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { Product } from "@/types/database"
@@ -11,14 +11,7 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product, className }: ProductCardProps) {
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("ru-RU", {
-      style: "currency",
-      currency: "RUB",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(price)
-  }
+  const navigate = useNavigate()
 
   return (
     <Link
@@ -101,7 +94,7 @@ export default function ProductCard({ product, className }: ProductCardProps) {
             className="gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => {
               e.preventDefault()
-              window.location.href = `/product/${product.slug}`
+              navigate(`/product/${product.slug}`)
             }}
           >
             <Zap className="h-3.5 w-3.5" />

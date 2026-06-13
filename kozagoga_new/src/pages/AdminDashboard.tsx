@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
+import { formatPrice } from "@/lib/utils"
 import type { Product, Order, Category } from "@/types/database"
 
 export default function AdminDashboard() {
@@ -40,15 +41,6 @@ export default function AdminDashboard() {
     }
     fetchData()
   }, [])
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("ru-RU", {
-      style: "currency",
-      currency: "RUB",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(price)
-  }
 
   const statusBadge = (status: string | null) => {
     const variants: Record<string, "default" | "secondary" | "success" | "warning" | "danger"> = {

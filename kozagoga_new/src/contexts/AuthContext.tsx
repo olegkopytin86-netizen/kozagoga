@@ -1,6 +1,10 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
-import { db } from "@lork/sdk"
 import type { AppUser } from "@/types/database"
+
+// API base URL — такой же, как в @lork/sdk
+const API_BASE = typeof window !== 'undefined'
+  ? (window.__KOZAGOGA_API_URL__ || 'http://localhost:3001')
+  : 'http://localhost:3001'
 
 interface AuthContextType {
   user: AppUser | null
@@ -13,132 +17,92 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+const TOKEN_KEY = "kozagogo_token"
+const USER_KEY = "kozagogo_user"
+
+// Храним токен в глобальной переменной для @lork/sdk
+let globalToken: string | null = null
+export function getStoredToken(): string | null {
+  return globalToken || localStorage.getItem(TOKEN_KEY)
+}
+
+async function apiPost(path: string, body: unknown) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  return res.json()
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Проверяем, есть ли сохранённая сессия
-    const stored = localStorage.getItem("kozagogo_user")
-    if (stored) {
+    // Восстанавливаем сессию из localStorage
+    const token = localStorage.getItem(TOKEN_KEY)
+    const stored = localStorage.getItem(USER_KEY)
+
+    if (token && stored) {
       try {
-        setUser(JSON.parse(stored))
+        const parsed = JSON.parse(stored)
+        if (parsed?.id && parsed?.email && parsed?.role) {
+          globalToken = token
+          setUser(parsed)
+        }
       } catch {
-        localStorage.removeItem("kozagogo_user")
+        localStorage.removeItem(TOKEN_KEY)
+        localStorage.removeItem(USER_KEY)
       }
     }
     setLoading(false)
   }, [])
 
+  const saveSession = (userData: AppUser, token: string) => {
+    globalToken = token
+    setUser(userData)
+    localStorage.setItem(TOKEN_KEY, token)
+    localStorage.setItem(USER_KEY, JSON.stringify(userData))
+  }
+
+  const clearSession = () => {
+    globalToken = null
+    setUser(null)
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
+  }
+
   const login = async (email: string, password: string): Promise<{ error: string | null }> => {
     try {
-      // Пытаемся найти пользователя в БД
-      const { data, error } = await db
-        .from("users")
-        .select("*")
-        .eq("email", email)
-        .single()
-
-      if (error || !data) {
-        // Если БД пуста, создаём демо-логин
-        if (email === "admin@kozagogo.ru" && password === "admin123") {
-          const demoUser: AppUser = {
-            id: "admin-demo-id",
-            email: "admin@kozagogo.ru",
-            role: "admin",
-            created_at: new Date().toISOString(),
-          }
-          setUser(demoUser)
-          localStorage.setItem("kozagogo_user", JSON.stringify(demoUser))
-          return { error: null }
-        }
-        if (email === "user@kozagogo.ru" && password === "user123") {
-          const demoUser: AppUser = {
-            id: "user-demo-id",
-            email: "user@kozagogo.ru",
-            role: "user",
-            created_at: new Date().toISOString(),
-          }
-          setUser(demoUser)
-          localStorage.setItem("kozagogo_user", JSON.stringify(demoUser))
-          return { error: null }
-        }
-        return { error: "Неверный email или пароль" }
-      }
-
-      const appUser: AppUser = {
-        id: data.id,
-        email: data.email,
-        role: data.role || "user",
-        created_at: data.created_at,
-      }
-      setUser(appUser)
-      localStorage.setItem("kozagogo_user", JSON.stringify(appUser))
+      const res = await apiPost("/api/auth/login", { email, password })
+      if (res.error) return { error: res.error }
+      saveSession(
+        { id: res.user.id, email: res.user.email, role: res.user.role, created_at: res.user.created_at },
+        res.token
+      )
       return { error: null }
     } catch {
-      return { error: "Ошибка входа. Попробуйте позже." }
+      return { error: "Ошибка подключения к серверу. Убедитесь, что API запущен." }
     }
   }
 
   const register = async (email: string, password: string): Promise<{ error: string | null }> => {
     try {
-      // Проверяем, не занят ли email
-      const { data: existing } = await db
-        .from("users")
-        .select("id")
-        .eq("email", email)
-        .single()
-
-      if (existing) {
-        return { error: "Пользователь с таким email уже существует" }
-      }
-
-      // Создаём пользователя
-      const { data, error } = await db
-        .from("users")
-        .insert({ email, password, role: "user" })
-        .select()
-        .single()
-
-      if (error || !data) {
-        // Если БД не настроена, создаём локальную сессию
-        const demoUser: AppUser = {
-          id: `local-${Date.now()}`,
-          email,
-          role: "user",
-          created_at: new Date().toISOString(),
-        }
-        setUser(demoUser)
-        localStorage.setItem("kozagogo_user", JSON.stringify(demoUser))
-        return { error: null }
-      }
-
-      const appUser: AppUser = {
-        id: data.id,
-        email: data.email,
-        role: data.role || "user",
-        created_at: data.created_at,
-      }
-      setUser(appUser)
-      localStorage.setItem("kozagogo_user", JSON.stringify(appUser))
+      const res = await apiPost("/api/auth/register", { email, password })
+      if (res.error) return { error: res.error }
+      saveSession(
+        { id: res.user.id, email: res.user.email, role: res.user.role, created_at: res.user.created_at },
+        res.token
+      )
       return { error: null }
     } catch {
-      // Fallback — локальная регистрация
-      const demoUser: AppUser = {
-        id: `local-${Date.now()}`,
-        email,
-        role: "user",
-        created_at: new Date().toISOString(),
-      }
-      setUser(demoUser)
-      localStorage.setItem("kozagogo_user", JSON.stringify(demoUser))
-      return { error: null }
+      return { error: "Ошибка подключения к серверу. Убедитесь, что API запущен." }
     }
   }
 
   const logout = async () => {
-    setUser(null)
-    localStorage.removeItem("kozagogo_user")
+    clearSession()
   }
 
   return (

@@ -8,6 +8,7 @@ import FilterPanel from "@/components/FilterPanel"
 import { ProductGridSkeleton } from "@/components/ProductSkeleton"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { categoryTitleMap } from "@/lib/categories"
 import type { Product } from "@/types/database"
 
 export default function Catalog() {
@@ -101,13 +102,7 @@ export default function Catalog() {
   }
 
   const categoryTitle = category
-    ? category === "games" ? "Игры"
-      : category === "top-ups" ? "Пополнение кошельков"
-      : category === "gift-cards" ? "Подарочные карты"
-      : category === "subscriptions" ? "Подписки"
-      : category === "accounts" ? "Аккаунты"
-      : category === "services" ? "Услуги"
-      : category
+    ? categoryTitleMap[category] || category
     : "Каталог"
 
   return (

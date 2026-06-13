@@ -2,20 +2,12 @@ import { useEffect, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { cn } from "@/lib/utils"
 import { db } from "@lork/sdk"
+import { defaultCategories } from "@/lib/categories"
 import type { Category } from "@/types/database"
 
 interface CategoryNavProps {
   className?: string
 }
-
-const defaultCategories = [
-  { name: "Игры", slug: "games", icon: "🎮" },
-  { name: "Пополнение кошельков", slug: "top-ups", icon: "💰" },
-  { name: "Подарочные карты", slug: "gift-cards", icon: "🎁" },
-  { name: "Подписки", slug: "subscriptions", icon: "📱" },
-  { name: "Аккаунты", slug: "accounts", icon: "👤" },
-  { name: "Услуги", slug: "services", icon: "⚡" },
-]
 
 export default function CategoryNav({ className }: CategoryNavProps) {
   const [searchParams] = useSearchParams()
