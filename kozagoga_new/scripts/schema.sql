@@ -1,4 +1,10 @@
--- Schema for Kozagogo Marketplace
+-- ============================================
+-- Schema for Kozagogo Marketplace + Integrations
+-- ============================================
+
+-- ═══════════════════════════════════════════
+-- БАЗОВЫЕ ТАБЛИЦЫ (существующие)
+-- ═══════════════════════════════════════════
 
 -- Users
 CREATE TABLE IF NOT EXISTS users (
@@ -8,7 +14,6 @@ CREATE TABLE IF NOT EXISTS users (
   role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 -- Categories
@@ -21,10 +26,9 @@ CREATE TABLE IF NOT EXISTS categories (
   sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories(slug);
 
--- Products
+-- Products (+ integration fields)
 CREATE TABLE IF NOT EXISTS products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -46,14 +50,18 @@ CREATE TABLE IF NOT EXISTS products (
   features JSONB DEFAULT '[]'::jsonb,
   faq JSONB DEFAULT '[]'::jsonb,
   tags JSONB DEFAULT '[]'::jsonb,
+  -- Integration fields
+  provider_code VARCHAR(50),               -- hyperion | paybox | ...
+  provider_service_id VARCHAR(100),        -- ID услуги у провайдера
+  provider_params JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ
 );
-
 CREATE INDEX IF NOT EXISTS idx_products_slug ON products(slug);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
 CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active);
 CREATE INDEX IF NOT EXISTS idx_products_featured ON products(is_featured);
+CREATE INDEX IF NOT EXISTS idx_products_provider ON products(provider_code);
 
 -- Product Images
 CREATE TABLE IF NOT EXISTS product_images (
@@ -64,10 +72,9 @@ CREATE TABLE IF NOT EXISTS product_images (
   sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_product_images_product ON product_images(product_id);
 
--- Orders
+-- Orders (+ integration fields)
 CREATE TABLE IF NOT EXISTS orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id),
@@ -75,14 +82,16 @@ CREATE TABLE IF NOT EXISTS orders (
   total NUMERIC(10, 2) NOT NULL,
   payment_status TEXT DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'failed', 'refunded')),
   payment_method TEXT,
+  -- Integration fields
+  provider_transaction_id VARCHAR(100),
+  provider_status VARCHAR(50),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ
 );
-
 CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 
--- Order Items
+-- Order Items (+ integration fields)
 CREATE TABLE IF NOT EXISTS order_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
@@ -90,20 +99,26 @@ CREATE TABLE IF NOT EXISTS order_items (
   product_name TEXT NOT NULL,
   quantity INTEGER NOT NULL DEFAULT 1,
   price NUMERIC(10, 2) NOT NULL,
+  -- Integration fields (denormalized for history)
+  provider_code VARCHAR(50),
+  provider_service_id VARCHAR(100),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 
--- Payments
+-- Payments (+ integration fields)
 CREATE TABLE IF NOT EXISTS payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id UUID NOT NULL REFERENCES orders(id),
   amount NUMERIC(10, 2) NOT NULL,
   method TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
+  gateway VARCHAR(50),
+  gateway_tx_id VARCHAR(255),
+  metadata JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
 
 -- Reviews
 CREATE TABLE IF NOT EXISTS reviews (
@@ -114,7 +129,6 @@ CREATE TABLE IF NOT EXISTS reviews (
   text TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_reviews_product ON reviews(product_id);
 
 -- Wallet Balances
@@ -125,6 +139,21 @@ CREATE TABLE IF NOT EXISTS wallet_balances (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Wallet Transactions
+CREATE TABLE IF NOT EXISTS wallet_transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id),
+  order_id UUID REFERENCES orders(id),
+  type VARCHAR(20) NOT NULL CHECK (type IN ('credit', 'debit', 'refund')),
+  amount NUMERIC(10, 2) NOT NULL,
+  balance_before NUMERIC(10, 2) NOT NULL,
+  balance_after NUMERIC(10, 2) NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_wallet_tx_user ON wallet_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_tx_order ON wallet_transactions(order_id);
+
 -- Admin Logs
 CREATE TABLE IF NOT EXISTS admin_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -133,3 +162,34 @@ CREATE TABLE IF NOT EXISTS admin_logs (
   details JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ═══════════════════════════════════════════
+-- ТАБЛИЦЫ ИНТЕГРАЦИЙ
+-- ═══════════════════════════════════════════
+
+-- Transactions (универсальная таблица для всех провайдеров)
+CREATE TABLE IF NOT EXISTS transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id UUID REFERENCES orders(id),
+  order_item_id UUID,
+  provider_code VARCHAR(50) NOT NULL,
+  provider_transaction_id VARCHAR(255),
+  provider_service_id VARCHAR(100),
+  operation VARCHAR(50) NOT NULL,
+  amount NUMERIC(10, 2),
+  currency VARCHAR(10) DEFAULT 'KGS',
+  transaction_amount NUMERIC(10, 2),
+  transaction_currency VARCHAR(10),
+  rate NUMERIC(10, 6),
+  request_body JSONB,
+  response_body JSONB,
+  provider_status VARCHAR(50),
+  description TEXT,
+  status VARCHAR(20) DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_transactions_order ON transactions(order_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_provider ON transactions(provider_code);
+CREATE INDEX IF NOT EXISTS idx_transactions_provider_tx ON transactions(provider_transaction_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);

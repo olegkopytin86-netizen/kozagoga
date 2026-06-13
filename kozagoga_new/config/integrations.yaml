@@ -1,0 +1,56 @@
+# ============================================
+# integrations.yaml — Конфигурация интеграций
+# ============================================
+
+# --- Реестр провайдеров услуг ---
+providers:
+  active:
+    - code: hyperion
+      class: "lib/providers/hyperion-provider.js"
+      enabled: true
+      label_ru: "Hyperion"
+
+    - code: paybox
+      class: "lib/providers/paybox-provider.js"
+      enabled: false
+      label_ru: "PayBox"
+
+# --- Параметры polling'а ---
+polling:
+  active_interval_sec: 5
+  active_max_attempts: 24
+  background_interval_hours: 1
+  background_max_hours: 24
+
+# --- Параметры алертов ---
+alerts:
+  pending_transaction:
+    timeout_hours: 24
+    priority: high
+    channels:
+      - admin_dashboard
+
+# --- Маппинг платёжных шлюзов ---
+payment_gateways:
+  card: yookassa
+  sbp: yookassa
+  wallet: wallet
+  yoomoney: yookassa
+
+# --- Параметры кэша ---
+cache:
+  service_list_ttl_sec: 3600
+  service_list_strategy: time_based
+
+# --- Retry-политика ---
+retry:
+  max_attempts: 3
+  base_timeout_ms: 1000
+  backoff_strategy: exponential
+  backoff_multiplier: 2
+
+# --- Rate limiting ---
+rate_limits:
+  validate: 60
+  orders: 30
+  payments: 20

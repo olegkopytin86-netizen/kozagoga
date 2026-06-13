@@ -1,5 +1,5 @@
 // Kozagogo Backend API Server
-// PostgreSQL + Express + JWT Auth
+// PostgreSQL + Express + JWT Auth + Integrations
 
 import express from 'express'
 import cors from 'cors'
@@ -27,6 +27,22 @@ const pool = new Pool({
   password: process.env.DB_PASS || 'kozagogo_pass_2024',
 })
 
+// ─── Инициализация модулей интеграций ──────────────────
+import { getConfig, getPollingConfig, getPaymentGatewayMapping, getRateLimits } from './lib/config-loader.js'
+import { initProviders, getProvider, listProviders } from './lib/providers/index.js'
+import YooKassaGateway from './lib/gateways/yookassa.js'
+import WalletGateway from './lib/gateways/wallet.js'
+
+// Платежные шлюзы
+const paymentGateways = {
+  yookassa: new YooKassaGateway({ code: 'yookassa' }),
+  wallet: new WalletGateway({ code: 'wallet' }, pool),
+}
+
+// Кэш сервисов (in-memory)
+let servicesCache = []
+let servicesCacheTime = 0
+
 // ─── Express setup ────────────────────────────────────────
 const app = express()
 app.use(cors({
@@ -35,11 +51,39 @@ app.use(cors({
 }))
 app.use(express.json())
 
-// ─── Auth middleware ──────────────────────────────────────
+// ─── Middleware ──────────────────────────────────────────
+
+// Rate limiting (simple in-memory)
+const rateCounters = new Map()
+function rateLimit(limitPerMin) {
+  return (req, res, next) => {
+    if (!limitPerMin) return next()
+    const key = req.ip + ':' + req.path
+    const now = Date.now()
+    const window = 60000 // 1 min
+
+    if (!rateCounters.has(key)) {
+      rateCounters.set(key, { count: 1, start: now })
+      return next()
+    }
+
+    const entry = rateCounters.get(key)
+    if (now - entry.start > window) {
+      rateCounters.set(key, { count: 1, start: now })
+      return next()
+    }
+
+    entry.count++
+    if (entry.count > limitPerMin) {
+      return res.status(429).json({ error: 'Слишком много запросов' })
+    }
+    next()
+  }
+}
+
 function authenticate(req, res, next) {
   const authHeader = req.headers.authorization
   if (!authHeader?.startsWith('Bearer ')) {
-    // Без токена — только публичные таблицы и read-only
     req.user = null
     return next()
   }
@@ -54,21 +98,28 @@ function authenticate(req, res, next) {
 }
 app.use(authenticate)
 
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'Не авторизован' })
+    if (!roles.includes(req.user.role)) return res.status(403).json({ error: 'Недостаточно прав' })
+    next()
+  }
+}
+
+function requireAuth(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: 'Не авторизован' })
+  next()
+}
+
 // ─── Auth endpoints ───────────────────────────────────────
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { email, password } = req.body
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email и пароль обязательны' })
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Пароль должен быть не менее 6 символов' })
-    }
+    if (!email || !password) return res.status(400).json({ error: 'Email и пароль обязательны' })
+    if (password.length < 6) return res.status(400).json({ error: 'Пароль должен быть не менее 6 символов' })
 
     const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email])
-    if (existing.rows.length > 0) {
-      return res.status(409).json({ error: 'Пользователь с таким email уже существует' })
-    }
+    if (existing.rows.length > 0) return res.status(409).json({ error: 'Пользователь с таким email уже существует' })
 
     const passwordHash = await bcrypt.hash(password, 10)
     const result = await pool.query(
@@ -92,20 +143,14 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email и пароль обязательны' })
-    }
+    if (!email || !password) return res.status(400).json({ error: 'Email и пароль обязательны' })
 
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email])
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Неверный email или пароль' })
-    }
+    if (result.rows.length === 0) return res.status(401).json({ error: 'Неверный email или пароль' })
 
     const user = result.rows[0]
     const valid = await bcrypt.compare(password, user.password_hash)
-    if (!valid) {
-      return res.status(401).json({ error: 'Неверный email или пароль' })
-    }
+    if (!valid) return res.status(401).json({ error: 'Неверный email или пароль' })
 
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' })
 
@@ -126,27 +171,763 @@ app.get('/api/auth/me', async (req, res) => {
   res.json(result.rows[0])
 })
 
-// ─── REST API (Supabase-совместимый) ──────────────────────
-// GET /api/rest/v1/:table?select=*&eq_column=value&order=column.asc&limit=10&offset=0
+// ═══════════════════════════════════════════════════════════
+// ИНТЕГРАЦИИ: ПРОВАЙДЕРЫ УСЛУГ
+// ═══════════════════════════════════════════════════════════
+
+// FR-06: GET /api/services — список сервисов от всех провайдеров
+app.get('/api/services', async (req, res) => {
+  try {
+    const cfg = getConfig()
+    const cacheTtl = (cfg.cache?.service_list_ttl_sec || 3600) * 1000
+
+    // Проверка кэша
+    if (servicesCache.length > 0 && Date.now() - servicesCacheTime < cacheTtl) {
+      return res.json(servicesCache)
+    }
+
+    const allServices = []
+    const providers = listProviders()
+
+    for (const provider of providers) {
+      try {
+        const services = await provider.getServices()
+        allServices.push(...services.map(s => ({ ...s, provider_code: provider.code })))
+      } catch (err) {
+        console.error(`[${provider.code}] Ошибка получения сервисов:`, err.message)
+      }
+    }
+
+    servicesCache = allServices
+    servicesCacheTime = Date.now()
+
+    res.json(allServices)
+  } catch (err) {
+    console.error('GET /api/services error:', err)
+    res.status(500).json({ error: 'Ошибка получения списка сервисов' })
+  }
+})
+
+// FR-07: POST /api/validate — валидация реквизита
+app.post('/api/validate', rateLimit(getRateLimits().validate || 60), async (req, res) => {
+  try {
+    const { product_id, requisite, params } = req.body
+    if (!product_id || !requisite) {
+      return res.status(400).json({ error: 'product_id и requisite обязательны' })
+    }
+
+    // Получаем товар
+    const productRes = await pool.query('SELECT * FROM products WHERE id = $1', [product_id])
+    if (productRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Товар не найден' })
+    }
+
+    const product = productRes.rows[0]
+    if (!product.provider_code) {
+      return res.status(400).json({ error: 'Товар не привязан к провайдеру' })
+    }
+
+    const provider = getProvider(product.provider_code)
+
+    // Получаем поля услуги (из кэша или запрашиваем)
+    let fields = []
+    try {
+      const services = await provider.getServices()
+      const service = services.find(s => s.id === product.provider_service_id)
+      fields = service?.fields || []
+    } catch {
+      // если провайдер недоступен — поля не загрузятся
+    }
+
+    const result = await provider.validate({
+      requisite,
+      params: params || {},
+      fields,
+      bearer: product.provider_service_id,
+      serviceId: product.provider_service_id
+    })
+
+    // Сохраняем транзакцию валидации в логах
+    await pool.query(
+      `INSERT INTO transactions (provider_code, operation, request_body, response_body, status)
+       VALUES ($1, 'requisite_enquiry', $2, $3, $4)`,
+      [product.provider_code, JSON.stringify({ product_id, requisite, params }), JSON.stringify(result), result.possible ? 'success' : 'error']
+    )
+
+    res.json(result)
+  } catch (err) {
+    console.error('POST /api/validate error:', err)
+    res.status(502).json({ error: 'Ошибка валидации', details: err.message })
+  }
+})
+
+// FR-08: POST /api/pay — отправка платежа провайдеру
+app.post('/api/pay', requireAuth, async (req, res) => {
+  try {
+    const { order_id } = req.body
+    if (!order_id) return res.status(400).json({ error: 'order_id обязателен' })
+
+    // Проверяем заказ
+    const orderRes = await pool.query('SELECT * FROM orders WHERE id = $1', [order_id])
+    if (orderRes.rows.length === 0) return res.status(404).json({ error: 'Заказ не найден' })
+
+    const order = orderRes.rows[0]
+
+    // Проверка прав: user только свои заказы, admin — любые
+    if (req.user.role !== 'admin' && order.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'Это не ваш заказ' })
+    }
+
+    if (order.payment_status !== 'paid') {
+      return res.status(400).json({ error: 'Заказ ещё не оплачен' })
+    }
+
+    // Получаем товары заказа
+    const itemsRes = await pool.query('SELECT * FROM order_items WHERE order_id = $1', [order_id])
+    const items = itemsRes.rows
+
+    const providerItems = items.filter(i => i.provider_code)
+
+    if (providerItems.length === 0) {
+      return res.status(400).json({ error: 'В заказе нет услуг для отправки провайдеру' })
+    }
+
+    const results = []
+
+    for (const item of providerItems) {
+      try {
+        const provider = getProvider(item.provider_code)
+
+        const txResult = await provider.pay({
+          bearer: item.provider_service_id,
+          account: item.product_name, // упрощённо; в реальности — реквизит из заказа
+          amount: item.price,
+          currency: 'KGS',
+          exclude_commission: true,
+          info: []
+        })
+
+        // Сохраняем транзакцию
+        await pool.query(
+          `INSERT INTO transactions (order_id, order_item_id, provider_code, provider_transaction_id, provider_service_id, operation, amount, request_body, response_body, status)
+           VALUES ($1, $2, $3, $4, $5, 'payment', $6, $7, $8, 'pending')`,
+          [order_id, item.id, item.provider_code, txResult.package_id, item.provider_service_id, item.price,
+           JSON.stringify(req.body), JSON.stringify(txResult)]
+        )
+
+        // Обновляем заказ
+        await pool.query(
+          `UPDATE orders SET provider_transaction_id = $1, provider_status = 'processing', status = 'processing', updated_at = now() WHERE id = $2`,
+          [txResult.package_id, order_id]
+        )
+
+        results.push({
+          item_id: item.id,
+          package_id: txResult.package_id,
+          provider_code: item.provider_code
+        })
+
+        // Запускаем polling
+        startPolling(order_id, txResult.package_id, provider, item)
+      } catch (err) {
+        console.error(`[pay] Ошибка для товара ${item.id}:`, err.message)
+        results.push({
+          item_id: item.id,
+          error: err.message
+        })
+      }
+    }
+
+    res.json({ results })
+  } catch (err) {
+    console.error('POST /api/pay error:', err)
+    res.status(500).json({ error: 'Ошибка отправки платежа провайдеру', details: err.message })
+  }
+})
+
+// FR-09: POST /api/status — статус транзакции провайдера
+app.post('/api/status', requireAuth, async (req, res) => {
+  try {
+    const { transaction_id, provider_code } = req.body
+    if (!transaction_id) return res.status(400).json({ error: 'transaction_id обязателен' })
+
+    // Определяем провайдера
+    let provider
+    if (provider_code) {
+      provider = getProvider(provider_code)
+    } else {
+      // Ищем провайдера по transaction_id в БД
+      const txRes = await pool.query(
+        'SELECT provider_code FROM transactions WHERE provider_transaction_id = $1 OR id = $1',
+        [transaction_id]
+      )
+      if (txRes.rows.length === 0) return res.status(404).json({ error: 'Транзакция не найдена' })
+      provider = getProvider(txRes.rows[0].provider_code)
+    }
+
+    const status = await provider.status(transaction_id)
+
+    res.json({
+      transaction_id,
+      ...status
+    })
+  } catch (err) {
+    console.error('POST /api/status error:', err)
+    res.status(502).json({ error: 'Ошибка получения статуса', details: err.message })
+  }
+})
+
+// FR-10: POST /api/precheck — предрасчёт комиссий
+app.post('/api/precheck', async (req, res) => {
+  try {
+    const { product_id, amount } = req.body
+    if (!product_id || !amount) return res.status(400).json({ error: 'product_id и amount обязательны' })
+
+    const productRes = await pool.query('SELECT * FROM products WHERE id = $1', [product_id])
+    if (productRes.rows.length === 0) return res.status(404).json({ error: 'Товар не найден' })
+
+    const product = productRes.rows[0]
+    if (!product.provider_code) return res.status(400).json({ error: 'Товар не привязан к провайдеру' })
+
+    const provider = getProvider(product.provider_code)
+    const result = await provider.precheck({
+      bearer: product.provider_service_id,
+      amount,
+      exclude_commission: true
+    })
+
+    res.json(result)
+  } catch (err) {
+    console.error('POST /api/precheck error:', err)
+    res.status(502).json({ error: 'Ошибка предрасчёта', details: err.message })
+  }
+})
+
+// FR-11: POST /api/cancel — отмена транзакции (только admin)
+app.post('/api/cancel', requireRole('admin'), async (req, res) => {
+  try {
+    const { transaction_id, provider_code } = req.body
+    if (!transaction_id) return res.status(400).json({ error: 'transaction_id обязателен' })
+
+    let provider
+    if (provider_code) {
+      provider = getProvider(provider_code)
+    } else {
+      const txRes = await pool.query(
+        'SELECT provider_code FROM transactions WHERE provider_transaction_id = $1 OR id = $1',
+        [transaction_id]
+      )
+      if (txRes.rows.length === 0) return res.status(404).json({ error: 'Транзакция не найдена' })
+      provider = getProvider(txRes.rows[0].provider_code)
+    }
+
+    const result = await provider.cancel(transaction_id)
+
+    // Логируем в admin_logs
+    await pool.query(
+      `INSERT INTO admin_logs (admin_id, action, details) VALUES ($1, 'cancel_transaction', $2)`,
+      [req.user.id, JSON.stringify({ transaction_id, provider_code, result })]
+    )
+
+    // Обновляем заказ
+    await pool.query(
+      `UPDATE orders SET provider_status = 'CANCELLED', status = 'cancelled', updated_at = now()
+       WHERE provider_transaction_id = $1`,
+      [transaction_id]
+    )
+
+    res.json({ result: true })
+  } catch (err) {
+    console.error('POST /api/cancel error:', err)
+    res.status(500).json({ error: 'Ошибка отмены', details: err.message })
+  }
+})
+
+// ═══════════════════════════════════════════════════════════
+// ИНТЕГРАЦИИ: ПЛАТЕЖНЫЙ ПРОЦЕССИНГ
+// ═══════════════════════════════════════════════════════════
+
+// FR-35: POST /api/orders — создание заказа
+app.post('/api/orders', requireAuth, rateLimit(getRateLimits().orders || 30), async (req, res) => {
+  try {
+    const { items, payment_method } = req.body
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Необходимо передать товары' })
+    }
+
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+
+      // Получаем товары для расчёта
+      const productIds = items.map(i => i.product_id).filter(Boolean)
+      let total = 0
+      const orderItemsData = []
+
+      for (const item of items) {
+        const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id])
+        if (prodRes.rows.length === 0) {
+          throw new Error(`Товар ${item.product_id} не найден`)
+        }
+        const product = prodRes.rows[0]
+        const quantity = item.quantity || 1
+        const itemTotal = parseFloat(product.price) * quantity
+        total += itemTotal
+
+        orderItemsData.push({
+          product_id: product.id,
+          product_name: product.name,
+          quantity,
+          price: product.price,
+          provider_code: product.provider_code,
+          provider_service_id: product.provider_service_id
+        })
+      }
+
+      // Создаём заказ
+      const orderRes = await client.query(
+        `INSERT INTO orders (user_id, total, payment_method, status, payment_status)
+         VALUES ($1, $2, $3, 'pending', 'pending') RETURNING *`,
+        [req.user.id, total, payment_method || null]
+      )
+      const order = orderRes.rows[0]
+
+      // Создаём элементы заказа
+      for (const item of orderItemsData) {
+        await client.query(
+          `INSERT INTO order_items (order_id, product_id, product_name, quantity, price, provider_code, provider_service_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [order.id, item.product_id, item.product_name, item.quantity, item.price, item.provider_code, item.provider_service_id]
+        )
+      }
+
+      await client.query('COMMIT')
+
+      res.status(201).json({ ...order, items: orderItemsData })
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
+  } catch (err) {
+    console.error('POST /api/orders error:', err)
+    res.status(500).json({ error: 'Ошибка создания заказа', details: err.message })
+  }
+})
+
+// FR-36: POST /api/payments/process — процессинг платежа
+app.post('/api/payments/process', requireAuth, rateLimit(getRateLimits().payments || 20), async (req, res) => {
+  try {
+    const { order_id, payment_method } = req.body
+    if (!order_id || !payment_method) {
+      return res.status(400).json({ error: 'order_id и payment_method обязательны' })
+    }
+
+    const orderRes = await pool.query('SELECT * FROM orders WHERE id = $1', [order_id])
+    if (orderRes.rows.length === 0) return res.status(404).json({ error: 'Заказ не найден' })
+
+    const order = orderRes.rows[0]
+
+    if (order.user_id !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Это не ваш заказ' })
+    }
+
+    if (order.payment_status !== 'pending') {
+      return res.status(400).json({ error: 'Заказ уже оплачен или отменён' })
+    }
+
+    // Определяем шлюз
+    const mapping = getPaymentGatewayMapping()
+    const gatewayCode = mapping[payment_method]
+    if (!gatewayCode) return res.status(400).json({ error: `Неизвестный метод оплаты: ${payment_method}` })
+
+    const gateway = paymentGateways[gatewayCode]
+    if (!gateway) return res.status(500).json({ error: `Шлюз ${gatewayCode} не настроен` })
+
+    const result = await gateway.createPayment({
+      order_id: order.id,
+      amount: order.total,
+      currency: 'RUB',
+      description: `Заказ #${order.id}`,
+      user: req.user,
+      return_url: `${req.headers.origin || 'http://localhost:5173'}/orders/${order.id}`
+    })
+
+    // Сохраняем платёж
+    await pool.query(
+      `INSERT INTO payments (order_id, amount, method, status, gateway, gateway_tx_id, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [order.id, order.total, payment_method, result.status || 'pending', gatewayCode, result.transaction_id,
+       JSON.stringify({ redirect_url: result.redirect_url })]
+    )
+
+    res.json(result)
+  } catch (err) {
+    console.error('POST /api/payments/process error:', err)
+    res.status(502).json({ error: 'Ошибка обработки платежа', details: err.message })
+  }
+})
+
+// FR-37: POST /api/payments/webhook — callback от платёжного шлюза
+app.post('/api/payments/webhook', async (req, res) => {
+  try {
+    // Определяем шлюз по контексту запроса
+    const gateway = paymentGateways.yookassa
+    const result = await gateway.processWebhook(req)
+
+    if (result.status === 'succeeded' || result.status === 'waiting_for_capture') {
+      const orderId = result.metadata?.order_id
+
+      if (orderId) {
+        // Обновляем статус заказа
+        await pool.query(
+          `UPDATE orders SET payment_status = 'paid', status = 'paid', updated_at = now() WHERE id = $1 AND payment_status = 'pending'`,
+          [orderId]
+        )
+
+        // Обновляем платёж
+        await pool.query(
+          `UPDATE payments SET status = 'paid' WHERE gateway_tx_id = $1`,
+          [result.transaction_id]
+        )
+      }
+    }
+
+    res.json({ received: true })
+  } catch (err) {
+    console.error('POST /api/payments/webhook error:', err)
+    res.status(200).json({ received: true }) // Всегда 200 для webhook
+  }
+})
+
+// FR-38: POST /api/payments/refund — возврат платежа
+app.post('/api/payments/refund', requireRole('admin'), async (req, res) => {
+  try {
+    const { order_id } = req.body
+    if (!order_id) return res.status(400).json({ error: 'order_id обязателен' })
+
+    const orderRes = await pool.query('SELECT * FROM orders WHERE id = $1', [order_id])
+    if (orderRes.rows.length === 0) return res.status(404).json({ error: 'Заказ не найден' })
+
+    const order = orderRes.rows[0]
+
+    // Ищем платёж
+    const payRes = await pool.query(
+      'SELECT * FROM payments WHERE order_id = $1 AND status = $2 LIMIT 1',
+      [order_id, 'paid']
+    )
+    if (payRes.rows.length === 0) return res.status(400).json({ error: 'Платёж не найден или уже возвращён' })
+
+    const payment = payRes.rows[0]
+    const gatewayCode = payment.gateway
+    const gateway = paymentGateways[gatewayCode]
+
+    if (!gateway) return res.status(500).json({ error: `Шлюз ${gatewayCode} не настроен` })
+
+    const result = await gateway.refundPayment(payment.gateway_tx_id, order.total)
+
+    // Обновляем статус
+    await pool.query(
+      `UPDATE orders SET payment_status = 'refunded', status = 'cancelled', updated_at = now() WHERE id = $1`,
+      [order_id]
+    )
+    await pool.query(
+      `UPDATE payments SET status = 'refunded' WHERE id = $1`,
+      [payment.id]
+    )
+
+    // Логируем
+    await pool.query(
+      `INSERT INTO admin_logs (admin_id, action, details) VALUES ($1, 'refund', $2)`,
+      [req.user.id, JSON.stringify({ order_id, result })]
+    )
+
+    res.json({ result: true })
+  } catch (err) {
+    console.error('POST /api/payments/refund error:', err)
+    res.status(500).json({ error: 'Ошибка возврата', details: err.message })
+  }
+})
+
+// ═══════════════════════════════════════════════════════════
+// WALLET OPERATIONS
+// ═══════════════════════════════════════════════════════════
+
+// FR-39: GET /api/wallet/balance — текущий баланс
+app.get('/api/wallet/balance', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT balance, updated_at FROM wallet_balances WHERE user_id = $1',
+      [req.user.id]
+    )
+    if (result.rows.length === 0) {
+      return res.json({ balance: 0 })
+    }
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error('GET /api/wallet/balance error:', err)
+    res.status(500).json({ error: 'Ошибка получения баланса' })
+  }
+})
+
+// FR-40: POST /api/wallet/debit — списание с кошелька
+app.post('/api/wallet/debit', requireAuth, async (req, res) => {
+  const client = await pool.connect()
+  try {
+    const { amount, description } = req.body
+    if (!amount || amount <= 0) return res.status(400).json({ error: 'Некорректная сумма' })
+
+    await client.query('BEGIN')
+
+    const balanceRes = await client.query(
+      'SELECT balance FROM wallet_balances WHERE user_id = $1 FOR UPDATE',
+      [req.user.id]
+    )
+
+    if (balanceRes.rows.length === 0) {
+      await client.query('ROLLBACK')
+      return res.status(404).json({ error: 'Кошелёк не найден' })
+    }
+
+    const currentBalance = parseFloat(balanceRes.rows[0].balance)
+    const debitAmount = parseFloat(amount)
+
+    if (currentBalance < debitAmount) {
+      await client.query('ROLLBACK')
+      return res.status(400).json({ error: 'Недостаточно средств' })
+    }
+
+    const newBalance = currentBalance - debitAmount
+
+    await client.query(
+      'UPDATE wallet_balances SET balance = $1, updated_at = now() WHERE user_id = $2',
+      [newBalance, req.user.id]
+    )
+
+    const txRes = await client.query(
+      `INSERT INTO wallet_transactions (user_id, type, amount, balance_before, balance_after, description)
+       VALUES ($1, 'debit', $2, $3, $4, $5) RETURNING *`,
+      [req.user.id, debitAmount, currentBalance, newBalance, description || 'Списание']
+    )
+
+    await client.query('COMMIT')
+
+    res.json({ balance: newBalance, transaction: txRes.rows[0] })
+  } catch (err) {
+    await client.query('ROLLBACK')
+    console.error('POST /api/wallet/debit error:', err)
+    res.status(500).json({ error: 'Ошибка списания' })
+  } finally {
+    client.release()
+  }
+})
+
+// FR-41: POST /api/wallet/credit — пополнение кошелька
+app.post('/api/wallet/credit', requireAuth, async (req, res) => {
+  const client = await pool.connect()
+  try {
+    const { amount, description } = req.body
+    if (!amount || amount <= 0) return res.status(400).json({ error: 'Некорректная сумма' })
+
+    await client.query('BEGIN')
+
+    const balanceRes = await client.query(
+      'SELECT balance FROM wallet_balances WHERE user_id = $1 FOR UPDATE',
+      [req.user.id]
+    )
+
+    if (balanceRes.rows.length === 0) {
+      await client.query('ROLLBACK')
+      return res.status(404).json({ error: 'Кошелёк не найден' })
+    }
+
+    const currentBalance = parseFloat(balanceRes.rows[0].balance)
+    const creditAmount = parseFloat(amount)
+    const newBalance = currentBalance + creditAmount
+
+    await client.query(
+      'UPDATE wallet_balances SET balance = $1, updated_at = now() WHERE user_id = $2',
+      [newBalance, req.user.id]
+    )
+
+    const txRes = await client.query(
+      `INSERT INTO wallet_transactions (user_id, type, amount, balance_before, balance_after, description)
+       VALUES ($1, 'credit', $2, $3, $4, $5) RETURNING *`,
+      [req.user.id, creditAmount, currentBalance, newBalance, description || 'Пополнение']
+    )
+
+    await client.query('COMMIT')
+
+    res.json({ balance: newBalance, transaction: txRes.rows[0] })
+  } catch (err) {
+    await client.query('ROLLBACK')
+    console.error('POST /api/wallet/credit error:', err)
+    res.status(500).json({ error: 'Ошибка пополнения' })
+  } finally {
+    client.release()
+  }
+})
+
+// FR-42: GET /api/wallet/transactions — история операций
+app.get('/api/wallet/transactions', requireAuth, async (req, res) => {
+  try {
+    const { limit = 50, offset = 0 } = req.query
+    const result = await pool.query(
+      `SELECT * FROM wallet_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+      [req.user.id, parseInt(limit), parseInt(offset)]
+    )
+    res.json(result.rows)
+  } catch (err) {
+    console.error('GET /api/wallet/transactions error:', err)
+    res.status(500).json({ error: 'Ошибка получения истории' })
+  }
+})
+
+// ═══════════════════════════════════════════════════════════
+// POLLING LOGIC
+// ═══════════════════════════════════════════════════════════
+
+function startPolling(orderId, packageId, provider, item) {
+  const pollConfig = getPollingConfig()
+  let attempts = 0
+  const maxAttempts = pollConfig.active_max_attempts || 24
+  const activeInterval = (pollConfig.active_interval_sec || 5) * 1000
+  const backgroundInterval = (pollConfig.background_interval_hours || 1) * 3600000
+  const maxBackgroundHours = pollConfig.background_max_hours || 24
+
+  console.log(`[polling] Запуск для order=${orderId}, package=${packageId}, provider=${provider.code}`)
+
+  // Активный polling
+  const activeTimer = setInterval(async () => {
+    attempts++
+
+    try {
+      const status = await provider.status(packageId)
+
+      // Сохраняем результат
+      await pool.query(
+        `UPDATE transactions SET provider_status = $1, response_body = $2, updated_at = now()
+         WHERE provider_transaction_id = $3 AND operation = 'payment'`,
+        [status.provider_status, JSON.stringify(status), packageId]
+      )
+
+      if (status.provider_status === 'COMPLETE' || status.provider_status === 'REBOOKED') {
+        clearInterval(activeTimer)
+        await pool.query(
+          `UPDATE orders SET provider_status = $1, status = 'completed', updated_at = now() WHERE id = $2`,
+          [status.provider_status, orderId]
+        )
+        console.log(`[polling] ✅ Заказ ${orderId} завершён: ${status.provider_status}`)
+        return
+      }
+
+      if (['FAILURE', 'CANCELLED', 'UNEXPECTED_ERROR'].includes(status.provider_status)) {
+        clearInterval(activeTimer)
+        await pool.query(
+          `UPDATE orders SET provider_status = $1, status = 'cancelled', updated_at = now() WHERE id = $2`,
+          [status.provider_status, orderId]
+        )
+        console.log(`[polling] ❌ Заказ ${orderId} отменён: ${status.provider_status}`)
+        // Здесь должен быть вызов refund
+        return
+      }
+
+      if (attempts >= maxAttempts) {
+        clearInterval(activeTimer)
+        console.log(`[polling] ⏰ Активный polling исчерпан для ${packageId}, перехожу в фоновый`)
+        startBackgroundPolling(orderId, packageId, provider)
+      }
+    } catch (err) {
+      console.error(`[polling] Ошибка для ${packageId}:`, err.message)
+      if (attempts >= maxAttempts) {
+        clearInterval(activeTimer)
+        startBackgroundPolling(orderId, packageId, provider)
+      }
+    }
+  }, activeInterval)
+}
+
+function startBackgroundPolling(orderId, packageId, provider) {
+  const maxBackgroundHours = getPollingConfig().background_max_hours || 24
+  const backgroundInterval = (getPollingConfig().background_interval_hours || 1) * 3600000
+  const startTime = Date.now()
+  let bgAttempts = 0
+
+  const bgTimer = setInterval(async () => {
+    bgAttempts++
+    const elapsedHours = (Date.now() - startTime) / 3600000
+
+    if (elapsedHours >= maxBackgroundHours) {
+      clearInterval(bgTimer)
+      console.log(`[polling] 🚨 Таймаут ${maxBackgroundHours}ч для ${packageId}, создаю алерт`)
+
+      // Создаём алерт в admin_logs
+      await pool.query(
+        `INSERT INTO admin_logs (admin_id, action, details) VALUES ($1, 'pending_transaction', $2)`,
+        ['00000000-0000-0000-0000-000000000000',
+         JSON.stringify({
+           order_id: orderId,
+           package_id: packageId,
+           provider: provider.code,
+           type: 'pending_transaction',
+           message: `Транзакция ${packageId} не получила статус за ${maxBackgroundHours}ч`
+         })]
+      )
+      return
+    }
+
+    try {
+      const status = await provider.status(packageId)
+
+      await pool.query(
+        `UPDATE transactions SET provider_status = $1, response_body = $2, updated_at = now()
+         WHERE provider_transaction_id = $3 AND operation = 'payment'`,
+        [status.provider_status, JSON.stringify(status), packageId]
+      )
+
+      if (status.provider_status === 'COMPLETE' || status.provider_status === 'REBOOKED') {
+        clearInterval(bgTimer)
+        await pool.query(
+          `UPDATE orders SET provider_status = $1, status = 'completed', updated_at = now() WHERE id = $2`,
+          [status.provider_status, orderId]
+        )
+        console.log(`[polling] ✅ (фон) Заказ ${orderId} завершён`)
+      }
+
+      if (['FAILURE', 'CANCELLED', 'UNEXPECTED_ERROR'].includes(status.provider_status)) {
+        clearInterval(bgTimer)
+        await pool.query(
+          `UPDATE orders SET provider_status = $1, status = 'cancelled', updated_at = now() WHERE id = $2`,
+          [status.provider_status, orderId]
+        )
+        console.log(`[polling] ❌ (фон) Заказ ${orderId} отменён`)
+      }
+    } catch (err) {
+      console.error(`[polling] (фон) Ошибка для ${packageId}:`, err.message)
+    }
+  }, backgroundInterval)
+}
+
+// ═══════════════════════════════════════════════════════════
+// REST API (Supabase-совместимый) — существующий
+// ═══════════════════════════════════════════════════════════
+
 app.get('/api/rest/v1/:table', async (req, res) => {
   const { table } = req.params
   const { select, order, limit, offset, ...filters } = req.query
 
-  // Только разрешённые таблицы
-  const allowedTables = ['users', 'categories', 'products', 'product_images', 'orders', 'order_items', 'payments', 'reviews', 'wallet_balances', 'admin_logs']
+  const allowedTables = ['users', 'categories', 'products', 'product_images', 'orders', 'order_items', 'payments', 'reviews', 'wallet_balances', 'wallet_transactions', 'transactions', 'admin_logs']
   if (!allowedTables.includes(table)) {
     return res.status(404).json({ error: 'Table not found' })
   }
 
-  // Если нет auth — только публичные таблицы
   if (!req.user && !['categories', 'products', 'product_images'].includes(table)) {
     return res.status(401).json({ error: 'Authentication required' })
   }
 
   try {
     const columns = select === '*' ? '*' : select?.split(',').map(c => c.trim()).join(', ') || '*'
-
-    // WHERE clauses from eq_ params
     const whereClauses = []
     const params = []
     let paramIdx = 1
@@ -185,19 +966,16 @@ app.get('/api/rest/v1/:table', async (req, res) => {
 
     const whereSQL = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : ''
 
-    // ORDER BY
     let orderSQL = ''
     if (order) {
       const parts = order.split('.')
       const col = parts[0]
       const dir = parts[1]?.toLowerCase() === 'desc' ? 'DESC' : 'ASC'
-      // Whitelist columns to prevent SQL injection
       if (col.match(/^[a-z_]+$/)) {
         orderSQL = `ORDER BY ${col} ${dir}`
       }
     }
 
-    // LIMIT / OFFSET
     const limitSQL = limit ? `LIMIT ${parseInt(limit)}` : ''
     const offsetSQL = offset ? `OFFSET ${parseInt(offset)}` : ''
 
@@ -211,16 +989,11 @@ app.get('/api/rest/v1/:table', async (req, res) => {
   }
 })
 
-// POST /api/rest/v1/:table — Insert
 app.post('/api/rest/v1/:table', async (req, res) => {
   const { table } = req.params
-  const allowedTables = ['users', 'categories', 'products', 'product_images', 'orders', 'order_items', 'payments', 'reviews', 'wallet_balances', 'admin_logs']
-  if (!allowedTables.includes(table)) {
-    return res.status(404).json({ error: 'Table not found' })
-  }
-  if (!req.user) {
-    return res.status(401).json({ error: 'Authentication required' })
-  }
+  const allowedTables = ['users', 'categories', 'products', 'product_images', 'orders', 'order_items', 'payments', 'reviews', 'wallet_balances', 'wallet_transactions', 'transactions', 'admin_logs']
+  if (!allowedTables.includes(table)) return res.status(404).json({ error: 'Table not found' })
+  if (!req.user) return res.status(401).json({ error: 'Authentication required' })
 
   try {
     const data = Array.isArray(req.body) ? req.body : [req.body]
@@ -243,7 +1016,6 @@ app.post('/api/rest/v1/:table', async (req, res) => {
   }
 })
 
-// PUT /api/rest/v1/:table — Update
 app.put('/api/rest/v1/:table', async (req, res) => {
   const { table } = req.params
   if (!req.user) return res.status(401).json({ error: 'Authentication required' })
@@ -265,7 +1037,6 @@ app.put('/api/rest/v1/:table', async (req, res) => {
   }
 })
 
-// DELETE /api/rest/v1/:table/:id
 app.delete('/api/rest/v1/:table/:id', async (req, res) => {
   const { table, id } = req.params
   if (!req.user) return res.status(401).json({ error: 'Authentication required' })
@@ -289,10 +1060,9 @@ app.get('/api/health', async (req, res) => {
   }
 })
 
-// ─── Seed endpoint ────────────────────────────────────────
+// ─── Seed endpoint (обновлённый) ──────────────────────────
 app.post('/api/seed', async (req, res) => {
   try {
-    // Categories
     await pool.query(`DELETE FROM categories`)
     const catResult = await pool.query(`
       INSERT INTO categories (name, slug, description, icon, sort_order) VALUES
@@ -301,24 +1071,19 @@ app.post('/api/seed', async (req, res) => {
         ('Подарочные карты', 'gift-cards', 'Подарочные карты магазинов и сервисов', '🎁', 3),
         ('Подписки', 'subscriptions', 'Подписки на сервисы и игры', '📱', 4),
         ('Аккаунты', 'accounts', 'Готовые игровые аккаунты', '👤', 5),
-        ('Услуги', 'services', 'Цифровые услуги и бусты', '⚡', 6)
+        ('Услуги', 'services', 'Цифровые услуги и бусты', '⚡', 6),
+        ('Мобильная связь', 'mobile', 'Пополнение мобильной связи', '📱', 7)
       RETURNING id, slug
     `)
     const catMap = {}
     catResult.rows.forEach(r => { catMap[r.slug] = r.id })
 
-    // Products
     await pool.query(`DELETE FROM products`)
     await pool.query(`
-      INSERT INTO products (name, slug, description, short_description, price, old_price, category_id, delivery_time, region, rating, review_count, stock, is_active, is_featured, seller_name, seller_verified, features, faq, tags) VALUES
-        ('Valorant — 1000 VP', 'valorant-1000-vp', 'Пополнение счётчика Valorant Points на 1000 VP. Мгновенная доставка на ваш аккаунт Riot Games.', '1000 VP для Valorant', 799, 899, '${catMap['top-ups']}', 'Мгновенно', 'Россия', 4.8, 234, 999, true, true, 'Kozagogo Official', true, '["1000 VP на ваш аккаунт","Мгновенная доставка","Работает во всех регионах","Поддержка 24/7"]'::jsonb, '[{"question":"Как получить VP?","answer":"После оплаты укажите ваш Riot ID, и мы отправим VP в течение минуты."},{"question":"Работает ли в РФ?","answer":"Да, пополнение работает для аккаунтов всех регионов."}]'::jsonb, '["valorant","vp","riot","пополнение"]'::jsonb),
-        ('Steam Gift Card 500 ₽', 'steam-gift-card-500', 'Подарочная карта Steam номиналом 500 рублей.', 'Подарочная карта Steam на 500 ₽', 500, null, '${catMap['gift-cards']}', '1–5 минут', 'Россия', 4.9, 567, 500, true, true, 'Kozagogo Official', true, '["Номинал 500 ₽","Активация в Steam","Пополнение кошелька"]'::jsonb, '[{"question":"Как активировать?","answer":"Код придёт на email. Активируйте в клиенте Steam."}]'::jsonb, '["steam","gift card","подарок","игры"]'::jsonb),
-        ('PlayStation Plus Essential (1 месяц)', 'ps-plus-essential-1m', 'Подписка PlayStation Plus Essential на 1 месяц.', 'PS Plus Essential на 1 месяц', 699, 799, '${catMap['subscriptions']}', 'Мгновенно', 'Россия', 4.7, 189, 300, true, false, 'Kozagogo Official', true, '["1 месяц PS Plus Essential","Многопользовательская игра","2 бесплатные игры в месяц"]'::jsonb, '[{"question":"Подходит для РФ аккаунта?","answer":"Да, код активируется на российском аккаунте PSN."}]'::jsonb, '["playstation","ps plus","подписка","sony"]'::jsonb),
-        ('PUBG — 1000 G-COIN', 'pubg-1000-gcoin', 'Пополнение G-COIN в PUBG.', '1000 G-COIN для PUBG', 249, null, '${catMap['top-ups']}', 'Мгновенно', 'Россия', 4.6, 145, 800, true, false, 'Kozagogo Official', true, '["1000 G-COIN","Для PC и консолей","Мгновенно"]'::jsonb, '[]'::jsonb, '["pubg","g-coin","пополнение"]'::jsonb),
-        ('World of Warcraft — 60 дней', 'wow-60-days', '60 дней игрового времени для WoW.', '60 дней WoW', 1499, 1799, '${catMap['subscriptions']}', '1–5 минут', 'Европа', 4.8, 98, 200, true, false, 'Kozagogo Official', true, '["60 дней игрового времени","Для всех версий WoW","Активация на Battle.net"]'::jsonb, '[{"question":"Как активировать?","answer":"Код активируется в личном кабинете Battle.net."}]'::jsonb, '["wow","world of warcraft","подписка","blizzard"]'::jsonb),
-        ('Xbox Game Pass Ultimate (1 месяц)', 'xbox-game-pass-ultimate-1m', 'Xbox Game Pass Ultimate на 1 месяц.', 'Xbox Game Pass Ultimate на месяц', 999, null, '${catMap['subscriptions']}', 'Мгновенно', 'Россия', 4.7, 312, 400, true, true, 'Kozagogo Official', true, '["1 месяц Ultimate","Xbox + PC","EA Play включён"]'::jsonb, '[]'::jsonb, '["xbox","game pass","microsoft","подписка"]'::jsonb),
-        ('Fortnite — 1000 V-Bucks', 'fortnite-1000-vbucks', '1000 V-Bucks для Fortnite.', '1000 V-Bucks', 599, 699, '${catMap['top-ups']}', 'Мгновенно', 'Россия', 4.5, 423, 600, true, false, 'Kozagogo Official', true, '["1000 V-Bucks","Для всех платформ","Мгновенная доставка"]'::jsonb, '[]'::jsonb, '["fortnite","v-bucks","пополнение","эпик"]'::jsonb),
-        ('Google Play Gift Card 1000 ₽', 'google-play-1000', 'Подарочная карта Google Play на 1000 рублей.', 'Google Play на 1000 ₽', 1000, null, '${catMap['gift-cards']}', '1–5 минут', 'Россия', 4.9, 876, 1000, true, true, 'Kozagogo Official', true, '["Номинал 1000 ₽","Для Google Play","Активация в приложении"]'::jsonb, '[{"question":"Как активировать?","answer":"Код придёт на email. Активируйте в Google Play."}]'::jsonb, '["google play","gift card","подарок","android"]'::jsonb)
+      INSERT INTO products (name, slug, description, short_description, price, old_price, category_id, delivery_time, region, rating, review_count, stock, is_active, is_featured, seller_name, seller_verified, features, faq, tags, provider_code, provider_service_id) VALUES
+        ('Valorant — 1000 VP', 'valorant-1000-vp', 'Пополнение счётчика Valorant Points на 1000 VP.', '1000 VP для Valorant', 799, 899, '${catMap['top-ups']}', 'Мгновенно', 'Россия', 4.8, 234, 999, true, true, 'Kozagogo Official', true, '["1000 VP"]'::jsonb, '[]'::jsonb, '["valorant","vp","riot"]'::jsonb, NULL, NULL),
+        ('Steam Gift Card 500 ₽', 'steam-gift-card-500', 'Подарочная карта Steam номиналом 500 рублей.', 'Steam Gift Card 500 ₽', 500, null, '${catMap['gift-cards']}', '1–5 минут', 'Россия', 4.9, 567, 500, true, true, 'Kozagogo Official', true, '["Номинал 500 ₽"]'::jsonb, '[]'::jsonb, '["steam","gift card"]'::jsonb, NULL, NULL),
+        ('Google Play Gift Card 1000 ₽', 'google-play-1000', 'Подарочная карта Google Play на 1000 рублей.', 'Google Play на 1000 ₽', 1000, null, '${catMap['gift-cards']}', '1–5 минут', 'Россия', 4.9, 876, 1000, true, true, 'Kozagogo Official', true, '["Номинал 1000 ₽"]'::jsonb, '[]'::jsonb, '["google play","gift card"]'::jsonb, NULL, NULL)
     `)
 
     res.json({ status: 'ok', message: 'База данных наполнена' })
@@ -329,9 +1094,26 @@ app.post('/api/seed', async (req, res) => {
 })
 
 // ─── Запуск ───────────────────────────────────────────────
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 API Server running on http://0.0.0.0:${PORT}`)
-  console.log(`📋 Health: http://localhost:${PORT}/api/health`)
-})
+async function start() {
+  try {
+    // Инициализируем провайдеров
+    await initProviders()
+    console.log('[server] Провайдеры инициализированы')
+
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 API Server running on http://0.0.0.0:${PORT}`)
+      console.log(`📋 Health: http://localhost:${PORT}/api/health`)
+      console.log(`📡 Services: http://localhost:${PORT}/api/services`)
+    })
+  } catch (err) {
+    console.error('[server] Ошибка при старте:', err.message)
+    // Сервер всё равно запускаем, провайдеры могут быть недоступны
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 API Server running on http://0.0.0.0:${PORT} (без провайдеров)`)
+    })
+  }
+}
+
+start()
 
 export default app
