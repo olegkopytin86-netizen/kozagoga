@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import type { AppUser } from "@/types/database"
 
-// API base URL — такой же, как в @lork/sdk
+// API_BASE — используем относительный путь (nginx проксирует /api/ на backend)
 const API_BASE = typeof window !== 'undefined'
-  ? (window.__KOZAGOGA_API_URL__ || 'http://localhost:3001')
-  : 'http://localhost:3001'
+  ? (window.__KOZAGOGA_API_URL__ || '')
+  : ''
 
 interface AuthContextType {
   user: AppUser | null

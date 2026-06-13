@@ -1,9 +1,11 @@
 // API Helper — единый клиент для работы с бэкендом
 // Использует токен из AuthContext
 
+// API_BASE — используем относительный путь (nginx проксирует /api/ на backend)
+// Для переопределения: window.__KOZAGOGA_API_URL__ = 'https://api.example.com'
 const API_BASE = typeof window !== 'undefined'
-  ? (window.__KOZAGOGA_API_URL__ || 'http://localhost:3001')
-  : 'http://localhost:3001'
+  ? (window.__KOZAGOGA_API_URL__ || '')
+  : ''
 
 function getToken(): string | null {
   try {
