@@ -12,7 +12,11 @@
     "seed": "node scripts/seed-admin.js && node src/bot/seed.js",
     "bot": "node src/bot/server.js",
     "start": "node server.js",
-    "go-live": "node scripts/go-live.mjs"
+    "go-live": "node scripts/go-live.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:regression": "pnpm test:coverage"
   },
   "dependencies": {
     "@hookform/resolvers": "3.10.0",
@@ -84,6 +88,7 @@
     "@vitejs/plugin-react": "4.7.0",
     "tailwindcss": "4.1.18",
     "typescript": "5.7.3",
-    "vite": "6.4.2"
+    "vite": "6.4.2",
+    "vitest": "^4.1.8"
   }
 }
