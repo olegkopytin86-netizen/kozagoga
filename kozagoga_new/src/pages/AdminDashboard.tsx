@@ -12,7 +12,7 @@ import {
   Trash2,
   ArrowLeft,
 } from "lucide-react"
-import { db } from "@lork/sdk"
+import { db } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"

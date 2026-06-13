@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/AuthContext"
 import { useCart } from "@/contexts/CartContext"
-import { db } from "@lork/sdk"
+import { db } from "@/lib/api"
 import { defaultCategories } from "@/lib/categories"
 import type { Category } from "@/types/database"
 

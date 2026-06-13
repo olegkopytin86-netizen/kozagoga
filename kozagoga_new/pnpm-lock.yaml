@@ -502,7 +502,7 @@ packages:
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
   '@lork/sdk@file:vendor/lork-sdk-0.2.0.tgz':
-    resolution: {integrity: sha512-7s3h0qPaBzY/G3/o4MgCnSeUgGZsUj+eAgXlhF3r+1I2A0BW/QA4Jc0XGeZMwJtAkcOMJYfQ7+k+2aG1DMk9jA==, tarball: file:vendor/lork-sdk-0.2.0.tgz}
+    resolution: {integrity: sha512-HFNDJZS9mR+aqZKIWNquWsbsB2G8BXUSOiPDK3tyPlNp+0WgHmlzu6bdFFxH9+H5XRo9rYJ6S+v/aiZ+3Pzn3w==, tarball: file:vendor/lork-sdk-0.2.0.tgz}
     version: 0.2.0
 
   '@mediapipe/tasks-vision@0.10.17':

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useParams, Link } from "react-router-dom"
 import { ArrowLeft, Package, Clock, CreditCard, User, CheckCircle, XCircle, AlertCircle, Loader2, RefreshCw } from "lucide-react"
-import { db } from "@lork/sdk"
+import { db } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"

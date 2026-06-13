@@ -1,6 +1,6 @@
 // Seed скрипт для наполнения базы данных Козагога
 // Запуск: npx tsx src/seed.ts
-import { db } from "@lork/sdk"
+import { db } from "@/lib/api"
 
 const categories = [
   { name: "Игры", slug: "games", description: "Цифровые версии игр, ключи и дополнения", icon: "🎮", sort_order: 1 },

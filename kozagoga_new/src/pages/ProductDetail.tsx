@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useParams, Link, useNavigate } from "react-router-dom"
 import { Star, Clock, MapPin, Shield, CheckCircle, ChevronLeft, Zap, Package, ShoppingCart, Info, MessageCircle, HelpCircle, ChevronDown, Minus, Plus } from "lucide-react"
-import { db } from "@lork/sdk"
+import { db } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"

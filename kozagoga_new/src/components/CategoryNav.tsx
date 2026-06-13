@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { cn } from "@/lib/utils"
-import { db } from "@lork/sdk"
+import { db } from "@/lib/api"
 import { defaultCategories } from "@/lib/categories"
 import type { Category } from "@/types/database"
 

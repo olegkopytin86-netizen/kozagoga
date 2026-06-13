@@ -145,6 +145,127 @@ export async function restGet<T = any>(table: string, params?: Record<string, st
   return handleResponse<T[]>(res)
 }
 
+// ═══════════════════════════════════════════════════════════
+// @lork/sdk — совместимая замена
+// Полная замена db.from().select().eq()...
+// ═══════════════════════════════════════════════════════════
+
+class QueryBuilder {
+  private table: string
+  private fields: string = '*'
+  private params: Record<string, string> = {}
+  private orderField: string = ''
+  private orderDir: string = ''
+  private limitVal: string = ''
+  private isSingle: boolean = false
+
+  constructor(table: string) {
+    this.table = table
+  }
+
+  select(fields: string) {
+    this.fields = fields
+    this.params['select'] = fields
+    return this
+  }
+
+  eq(key: string, value: string | number | boolean) {
+    this.params[`eq_${key}`] = String(value)
+    return this
+  }
+
+  neq(key: string, value: string | number) {
+    this.params[`neq_${key}`] = String(value)
+    return this
+  }
+
+  gt(key: string, value: string | number) {
+    this.params[`gt_${key}`] = String(value)
+    return this
+  }
+
+  gte(key: string, value: string | number) {
+    this.params[`gte_${key}`] = String(value)
+    return this
+  }
+
+  lt(key: string, value: string | number) {
+    this.params[`lt_${key}`] = String(value)
+    return this
+  }
+
+  lte(key: string, value: string | number) {
+    this.params[`lte_${key}`] = String(value)
+    return this
+  }
+
+  ilike(key: string, value: string) {
+    this.params[`ilike_${key}`] = value
+    return this
+  }
+
+  order(key: string, opts?: { ascending?: boolean }) {
+    this.orderField = key
+    this.orderDir = opts?.ascending === false ? 'desc' : 'asc'
+    this.params['order'] = `${key}.${this.orderDir}`
+    return this
+  }
+
+  limit(n: number) {
+    this.limitVal = String(n)
+    this.params['limit'] = String(n)
+    return this
+  }
+
+  single() {
+    this.isSingle = true
+    this.params['limit'] = '1'
+    return this
+  }
+
+  async then(resolve: (value: any) => any, reject?: (reason: any) => any) {
+    try {
+      const result = await this.execute()
+      resolve(result)
+    } catch (err) {
+      if (reject) reject(err)
+    }
+  }
+
+  async execute<T = any>(): Promise<{ data: T[] | null; error: string | null; count: number }> {
+    try {
+      const qs = new URLSearchParams(this.params).toString()
+      const url = `${API_BASE}/api/rest/v1/${this.table}${qs ? '?' + qs : ''}`
+      const res = await fetch(url, { headers: headers() })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        return { data: null, error: body.error || `HTTP ${res.status}`, count: 0 }
+      }
+
+      const rows = await res.json()
+
+      if (this.isSingle) {
+        return { data: (rows[0] || null) as any, error: null, count: rows.length }
+      }
+
+      return { data: rows, error: null, count: rows.length }
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network error', count: 0 }
+    }
+  }
+}
+
+/**
+ * Полная замена @lork/sdk — совместимый API
+ * Использование: db.from("products").select("*").eq("slug", "foo").single()
+ */
+export const db = {
+  from(table: string) {
+    return new QueryBuilder(table)
+  },
+}
+
 // Добавляем тип в window для API_BASE
 declare global {
   interface Window {

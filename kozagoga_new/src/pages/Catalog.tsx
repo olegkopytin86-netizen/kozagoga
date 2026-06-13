@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { Search, Package } from "lucide-react"
-import { db } from "@lork/sdk"
+import { db } from "@/lib/api"
 import ProductCard from "@/components/ProductCard"
 import CategoryNav from "@/components/CategoryNav"
 import FilterPanel from "@/components/FilterPanel"

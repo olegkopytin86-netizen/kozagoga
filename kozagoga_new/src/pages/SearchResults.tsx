@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useSearchParams, Link } from "react-router-dom"
 import { Search, ArrowLeft } from "lucide-react"
-import { db } from "@lork/sdk"
+import { db } from "@/lib/api"
 import ProductCard from "@/components/ProductCard"
 import { ProductGridSkeleton } from "@/components/ProductSkeleton"
 import { Button } from "@/components/ui/button"
