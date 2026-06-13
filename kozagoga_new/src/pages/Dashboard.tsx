@@ -1,11 +1,23 @@
+import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-import { User, ShoppingCart, Settings, CreditCard, LogOut, ArrowRight } from "lucide-react"
+import { User, ShoppingCart, Settings, CreditCard, LogOut, ArrowRight, Wallet as WalletIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { useAuth } from "@/contexts/AuthContext"
+import { getWalletBalance } from "@/lib/api"
+import { formatPrice } from "@/lib/utils"
 
 export default function Dashboard() {
   const { user, logout } = useAuth()
+  const [balance, setBalance] = useState<number | null>(null)
+  const [balanceLoading, setBalanceLoading] = useState(true)
+
+  useEffect(() => {
+    getWalletBalance()
+      .then((res) => setBalance(Number(res.balance)))
+      .catch(() => setBalance(null))
+      .finally(() => setBalanceLoading(false))
+  }, [])
 
   const menuItems = [
     {
@@ -63,10 +75,15 @@ export default function Dashboard() {
                   Роль: {user?.role === "admin" ? "Администратор" : "Пользователь"}
                 </p>
               </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold">0 ₽</p>
-                <p className="text-xs text-muted-foreground">Баланс кошелька</p>
-              </div>
+              <Link to="/dashboard/wallet" className="text-right block hover:opacity-80 transition-opacity">
+                <p className="text-2xl font-bold font-mono">
+                  {balanceLoading ? "..." : balance !== null ? formatPrice(balance) : "—"}
+                </p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
+                  <WalletIcon className="w-3 h-3" />
+                  Баланс кошелька
+                </p>
+              </Link>
             </CardContent>
           </Card>
         </div>

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { ShoppingCart, ArrowLeft, Trash2, Minus, Plus, Zap, ShoppingBag, CreditCard } from "lucide-react"
+import { ShoppingCart, ArrowLeft, Trash2, Minus, Plus, Zap, ShoppingBag, CreditCard, Wallet as WalletIcon, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
@@ -9,6 +9,9 @@ import { Label } from "@/components/ui/label"
 import { formatPrice } from "@/lib/utils"
 import { useCart } from "@/contexts/CartContext"
 import { useAuth } from "@/contexts/AuthContext"
+import { createOrder, processPayment } from "@/lib/api"
+
+type PaymentMethod = "card" | "sbp" | "yoomoney" | "wallet"
 
 export default function Checkout() {
   const { items, removeItem, updateQuantity, clearCart, subtotal, itemCount } = useCart()
@@ -18,9 +21,11 @@ export default function Checkout() {
   const [promoDiscount, setPromoDiscount] = useState(0)
   const [promoError, setPromoError] = useState("")
   const [email, setEmail] = useState(user?.email || "")
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "sbp" | "yoomoney">("card")
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
   const [isProcessing, setIsProcessing] = useState(false)
+  const [error, setError] = useState("")
   const [isSuccess, setIsSuccess] = useState(false)
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null)
 
   const applyPromo = () => {
     setPromoError("")
@@ -39,12 +44,36 @@ export default function Checkout() {
   const total = subtotal - discount
 
   const handlePayment = async () => {
+    setError("")
     setIsProcessing(true)
-    // Имитация оплаты
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setIsProcessing(false)
-    setIsSuccess(true)
-    clearCart()
+
+    try {
+      // 1. Создаём заказ
+      const orderItems = items.map(i => ({
+        product_id: i.productId,
+        quantity: i.quantity,
+      }))
+
+      const order = await createOrder(orderItems, paymentMethod)
+      setCreatedOrderId(order.id)
+
+      // 2. Процессинг платежа
+      const payment = await processPayment(order.id, paymentMethod)
+
+      if (payment.redirect_url) {
+        // Редирект на платёжную страницу шлюза
+        window.location.href = payment.redirect_url
+        return
+      }
+
+      // Без редиректа (wallet) — сразу успех
+      setIsSuccess(true)
+      clearCart()
+    } catch (err: any) {
+      setError(err.message || "Ошибка оплаты. Попробуйте снова.")
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   if (isSuccess) {
@@ -197,11 +226,12 @@ export default function Checkout() {
               <Card>
                 <CardContent className="p-4">
                   <h2 className="mb-4 text-lg font-semibold">Способ оплаты</h2>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
                     {[
                       { id: "card" as const, label: "Банковская карта", icon: "💳", desc: "Visa, Mastercard, Мир" },
                       { id: "sbp" as const, label: "СБП", icon: "📱", desc: "Система быстрых платежей" },
                       { id: "yoomoney" as const, label: "ЮMoney", icon: "💰", desc: "Электронный кошелёк" },
+                      { id: "wallet" as const, label: "Кошелёк", icon: "🏦", desc: "Внутренний счёт" },
                     ].map((method) => (
                       <button
                         key={method.id}
@@ -264,12 +294,8 @@ export default function Checkout() {
                         Применить
                       </Button>
                     </div>
-                    {promoError && (
-                      <p className="mt-1 text-xs text-red-500">{promoError}</p>
-                    )}
-                    {promoDiscount > 0 && (
-                      <p className="mt-1 text-xs text-emerald-600">Промокод применён!</p>
-                    )}
+                    {promoError && <p className="mt-1 text-xs text-red-500">{promoError}</p>}
+                    {promoDiscount > 0 && <p className="mt-1 text-xs text-emerald-600">Промокод применён!</p>}
                   </div>
 
                   <Separator className="mb-4" />
@@ -279,6 +305,12 @@ export default function Checkout() {
                     <span className="text-2xl font-bold text-primary">{formatPrice(total)}</span>
                   </div>
 
+                  {error && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                      {error}
+                    </div>
+                  )}
+
                   <Button
                     size="lg"
                     className="w-full gap-2"
@@ -287,7 +319,7 @@ export default function Checkout() {
                   >
                     {isProcessing ? (
                       <>
-                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        <Loader2 className="h-5 w-5 animate-spin" />
                         Обработка...
                       </>
                     ) : (

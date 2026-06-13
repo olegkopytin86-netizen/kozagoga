@@ -39,6 +39,9 @@ export interface Product {
   features: string[] | null
   faq: { question: string; answer: string }[] | null
   tags: string[] | null
+  provider_code: string | null
+  provider_service_id: string | null
+  provider_params: Record<string, any>[] | null
   created_at: string
   updated_at: string | null
 }
@@ -59,6 +62,8 @@ export interface Order {
   total: number
   payment_status: string | null
   payment_method: string | null
+  provider_transaction_id: string | null
+  provider_status: string | null
   created_at: string
   updated_at: string | null
 }
@@ -70,6 +75,8 @@ export interface OrderItem {
   product_name: string
   quantity: number
   price: number
+  provider_code: string | null
+  provider_service_id: string | null
   created_at: string
 }
 

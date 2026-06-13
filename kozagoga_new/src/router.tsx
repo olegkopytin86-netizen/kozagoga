@@ -16,6 +16,7 @@ import Cart from './pages/Cart'
 import OrderDetail from './pages/OrderDetail'
 import Profile from './pages/Profile'
 import AdminDashboard from './pages/AdminDashboard'
+import WalletPage from './pages/Wallet'
 import NotFound from './pages/NotFound'
 import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute'
 
@@ -36,6 +37,10 @@ export const router = createBrowserRouter([
       {
         path: 'dashboard',
         element: <ProtectedRoute><Dashboard /></ProtectedRoute>,
+      },
+      {
+        path: 'dashboard/wallet',
+        element: <ProtectedRoute><WalletPage /></ProtectedRoute>,
       },
       { path: 'checkout', element: <Checkout /> },
       {
