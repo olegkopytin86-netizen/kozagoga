@@ -10,6 +10,7 @@ import { formatPrice } from "@/lib/utils"
 import { useCart } from "@/contexts/CartContext"
 import { useAuth } from "@/contexts/AuthContext"
 import { createOrder, processPayment } from "@/lib/api"
+import SberPayButton from "@/components/payment/SberPayButton"
 
 type PaymentMethod = "card" | "sbp" | "sberpay" | "wallet"
 
@@ -230,7 +231,6 @@ export default function Checkout() {
                     {[
                       { id: "card" as const, label: "Банковская карта", icon: "💳", desc: "Visa, Mastercard, Мир" },
                       { id: "sbp" as const, label: "СБП", icon: "📱", desc: "Система быстрых платежей" },
-                      { id: "sberpay" as const, label: "СберПэй", icon: "🏦", desc: "Оплата через СберБанк Онлайн" },
                       { id: "wallet" as const, label: "Кошелёк", icon: "🏦", desc: "Внутренний счёт" },
                     ].map((method) => (
                       <button
@@ -247,6 +247,11 @@ export default function Checkout() {
                         <div className="text-xs text-muted-foreground">{method.desc}</div>
                       </button>
                     ))}
+                    {/* Фирменная кнопка СберПэй */}
+                    <SberPayButton
+                      selected={paymentMethod === "sberpay"}
+                      onClick={() => setPaymentMethod("sberpay")}
+                    />
                   </div>
                 </CardContent>
               </Card>
