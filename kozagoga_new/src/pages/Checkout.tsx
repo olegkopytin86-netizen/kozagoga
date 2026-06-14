@@ -336,11 +336,10 @@ export default function Checkout() {
                         </>
                       ) : (
                         <>
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/25">
                             <span className="text-xs font-bold text-white">С</span>
                           </div>
-                          <span>Оплатить</span>
-                          <span className="font-bold tracking-wide">Pay</span>
+                          <span className="text-lg font-bold tracking-wide">Pay</span>
                         </>
                       )}
                     </button>
