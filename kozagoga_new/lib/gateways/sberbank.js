@@ -14,7 +14,7 @@ const ERROR_MAP = {
   '2':  { message: 'Платёж не найден',            action: 'error_client' },
   '3':  { message: 'Операция недоступна',         action: 'error_client' },
   '4':  { message: 'Ошибка аутентификации шлюза', action: 'alert_admin' },
-  '5':  { message: 'Недостаточно прав',           action: 'alert_admin' },
+  '5':  { message: 'Платёжный шлюз временно недоступен. Попробуйте другой способ оплаты.', action: 'error_client' },
   '6':  { message: 'Некорректные данные',         action: 'error_client' },
   '7':  { message: 'Системная ошибка',            action: 'retry_3x_or_alert' },
   '8':  { message: 'Заказ уже оплачен',           action: 'proceed_existing' },
@@ -132,14 +132,14 @@ export default class SberbankGateway extends PaymentGateway {
       sessionTimeoutSecs: String(this.sessionTimeout),
     }
 
-    // Для СберПэй добавляем jsonParams с приоритетом этого способа оплаты
-    if (payment_way === 'sberpay') {
-      params.jsonParams = JSON.stringify({
-        paymentWay: 'SberPay'
-      })
-    }
+    // Для СберПэй: pageView уже установлен в MOBILE
+    // jsonParams не используется для тестового контура
 
     const { data, errorCode } = await this._apiCall('register.do', params)
+
+    // Логируем ответ Сбера для отладки
+    console.log(`[sberbank] register.do response: errorCode=${errorCode}`, JSON.stringify(data).slice(0, 200))
+
     const err = this._handleError(errorCode, 'register.do', { orderNumber })
 
     // Если заказ уже существует — возвращаем что есть
