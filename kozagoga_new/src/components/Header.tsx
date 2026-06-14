@@ -43,7 +43,7 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <header className="sticky top-0 z-50 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
           {/* Логотип */}
@@ -65,7 +65,7 @@ export default function Header() {
                 placeholder="Поиск игр, ключей, пополнений..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 bg-secondary/50 border-none focus-visible:bg-white"
+                className="w-full pl-10 bg-card text-card-foreground placeholder:text-muted-foreground shadow-sm border border-border/80 focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
           </form>
@@ -205,7 +205,7 @@ export default function Header() {
 
       {/* Мобильное меню */}
       {mobileMenuOpen && (
-        <div className="border-t bg-white md:hidden">
+        <div className="border-t border-border/40 bg-background md:hidden">
           <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
             <form onSubmit={handleSearch} className="mb-4">
               <div className="relative">
@@ -215,7 +215,7 @@ export default function Header() {
                   placeholder="Поиск товаров..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10"
+                  className="w-full pl-10 bg-card text-card-foreground placeholder:text-muted-foreground border border-border/80 shadow-sm"
                 />
               </div>
             </form>

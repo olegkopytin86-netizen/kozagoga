@@ -53,7 +53,7 @@ export default function ProductDetail() {
       productId: product.id,
       name: product.name,
       price: product.price,
-      image: images[0]?.url || "",
+      image: images[0]?.url || product.image || "",
       slug: product.slug,
     })
     setAddedToCart(true)
@@ -118,7 +118,7 @@ export default function ProductDetail() {
             <div className="mb-4 overflow-hidden rounded-xl border bg-secondary">
               <img
                 src={
-                  images[activeImage]?.url ||
+                  images[activeImage]?.url || product.image ||
                   `https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=800&q=80`
                 }
                 alt={images[activeImage]?.alt || product.name}
