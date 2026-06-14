@@ -23,7 +23,6 @@ export default function Checkout() {
   const [promoError, setPromoError] = useState("")
   const [email, setEmail] = useState(user?.email || "")
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
-  const [phoneNumber, setPhoneNumber] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState("")
   const [isSuccess, setIsSuccess] = useState(false)
@@ -228,32 +227,38 @@ export default function Checkout() {
               <Card>
                 <CardContent className="p-4">
                   <h2 className="mb-4 text-lg font-semibold">Способ оплаты</h2>
-                  {/* Фирменная кнопка СберПэй — над остальными способами */}
-                  <SberPayButton
-                    selected={paymentMethod === "sberpay"}
-                    onClick={() => setPaymentMethod("sberpay")}
-                  />
-
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
-                    {[
-                      { id: "card" as const, label: "Банковская карта", icon: "💳", desc: "Visa, Mastercard, Мир" },
-                      { id: "sbp" as const, label: "СБП", icon: "📱", desc: "Система быстрых платежей" },
-                      { id: "wallet" as const, label: "Кошелёк", icon: "🏦", desc: "Внутренний счёт" },
-                    ].map((method) => (
-                      <button
-                        key={method.id}
-                        onClick={() => setPaymentMethod(method.id)}
-                        className={`rounded-xl border p-4 text-left transition-all ${
-                          paymentMethod === method.id
-                            ? "border-primary bg-primary/5 ring-1 ring-primary"
-                            : "hover:border-primary/30"
-                        }`}
-                      >
-                        <div className="mb-1 text-2xl">{method.icon}</div>
-                        <div className="text-sm font-medium">{method.label}</div>
-                        <div className="text-xs text-muted-foreground">{method.desc}</div>
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {/* СберПэй */}
+                    <SberPayButton
+                      selected={paymentMethod === "sberpay"}
+                      onClick={() => setPaymentMethod("sberpay")}
+                    />
+                    {/* СБП */}
+                    <button
+                      onClick={() => setPaymentMethod("sbp")}
+                      className={`rounded-xl border p-4 text-left transition-all ${
+                        paymentMethod === "sbp"
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "hover:border-primary/30"
+                      }`}
+                    >
+                      <div className="mb-1 text-2xl">📱</div>
+                      <div className="text-sm font-medium">СБП</div>
+                      <div className="text-xs text-muted-foreground">Система быстрых платежей</div>
+                    </button>
+                    {/* Банковская карта */}
+                    <button
+                      onClick={() => setPaymentMethod("card")}
+                      className={`rounded-xl border p-4 text-left transition-all ${
+                        paymentMethod === "card"
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "hover:border-primary/30"
+                      }`}
+                    >
+                      <div className="mb-1 text-2xl">💳</div>
+                      <div className="text-sm font-medium">Банковская карта</div>
+                      <div className="text-xs text-muted-foreground">Visa, Mastercard, Мир</div>
+                    </button>
                   </div>
                 </CardContent>
               </Card>
