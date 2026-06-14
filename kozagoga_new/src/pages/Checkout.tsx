@@ -230,7 +230,7 @@ export default function Checkout() {
                     {[
                       { id: "card" as const, label: "Банковская карта", icon: "💳", desc: "Visa, Mastercard, Мир" },
                       { id: "sbp" as const, label: "СБП", icon: "📱", desc: "Система быстрых платежей" },
-                      { id: "sberpay" as const, label: "СберПэй", icon: "🏦", desc: "Оплата через СберБанк" },
+                      { id: "sberpay" as const, label: "СберПэй", icon: "🏦", desc: "Оплата через СберБанк Онлайн" },
                       { id: "wallet" as const, label: "Кошелёк", icon: "🏦", desc: "Внутренний счёт" },
                     ].map((method) => (
                       <button

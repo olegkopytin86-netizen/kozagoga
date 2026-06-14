@@ -118,7 +118,7 @@ export default class SberbankGateway extends PaymentGateway {
   }
 
   // ─── createPayment: register.do ─────────────────────────
-  async createPayment({ order_id, amount, currency, description, user, return_url, fail_url }) {
+  async createPayment({ order_id, amount, currency, description, user, return_url, fail_url, payment_way }) {
     const orderNumber = `order-${order_id}`.slice(0, 32) // макс 32 символа
 
     const params = {
@@ -128,8 +128,15 @@ export default class SberbankGateway extends PaymentGateway {
       returnUrl: return_url || this.returnUrl,
       failUrl: fail_url || this.failUrl,
       description: description || `Заказ #${order_id}`,
-      pageView: 'DESKTOP',
+      pageView: payment_way === 'sberpay' ? 'MOBILE' : 'DESKTOP',
       sessionTimeoutSecs: String(this.sessionTimeout),
+    }
+
+    // Для СберПэй добавляем jsonParams с приоритетом этого способа оплаты
+    if (payment_way === 'sberpay') {
+      params.jsonParams = JSON.stringify({
+        paymentWay: 'SberPay'
+      })
     }
 
     const { data, errorCode } = await this._apiCall('register.do', params)
