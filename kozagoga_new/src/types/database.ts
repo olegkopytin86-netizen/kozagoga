@@ -23,6 +23,7 @@ export interface Product {
   slug: string
   description: string
   short_description: string | null
+  image: string | null
   price: number
   old_price: number | null
   category_id: string | null
