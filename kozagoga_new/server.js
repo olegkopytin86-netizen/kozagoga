@@ -657,7 +657,7 @@ app.post('/api/payments/process', requireAuth, rateLimit(getRateLimits().payment
       currency: 'RUB',
       description: `Заказ #${order.id}`,
       user: req.user,
-      return_url: `${req.headers.origin || 'http://localhost:5173'}/orders/${order.id}`,
+      return_url: `https://${req.headers.host || 'localhost:5173'}/orders/${order.id}`,
       payment_way: payment_method
     })
 

@@ -49,7 +49,7 @@ export async function processPayment(order_id: string, payment_method: string) {
     headers: headers(),
     body: JSON.stringify({ order_id, payment_method }),
   })
-  return handleResponse<{ redirect_url: string | null; transaction_id: string; status: string }>(res)
+  return handleResponse<{ redirect_url: string | null; deep_links?: string[]; transaction_id: string; status: string }>(res)
 }
 
 export async function getOrderStatus(transaction_id: string, provider_code?: string) {
