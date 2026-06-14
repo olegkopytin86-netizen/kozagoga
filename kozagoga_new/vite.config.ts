@@ -17,6 +17,31 @@ export default defineConfig({
   // потому что node_modules может быть symlink на readonly папку
   cacheDir: '.vite',
   
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+            return 'vendor-react'
+          }
+          if (id.includes('node_modules/framer-motion') || id.includes('node_modules/lucide-react') || id.includes('node_modules/recharts')) {
+            return 'vendor-ui'
+          }
+          if (id.includes('node_modules/three') || id.includes('node_modules/@react-three')) {
+            return 'vendor-3d'
+          }
+          if (id.includes('node_modules/@radix-ui')) {
+            return 'vendor-radix'
+          }
+          if (id.includes('node_modules/react-hook-form') || id.includes('node_modules/zod')) {
+            return 'vendor-forms'
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 300,
+  },
+  
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

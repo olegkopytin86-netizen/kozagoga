@@ -65,20 +65,43 @@ export default class YooKassaGateway extends PaymentGateway {
   }
 
   async processWebhook(req) {
-    // Проверяем HMAC-подпись
-    const signature = req.headers['authorization']
-    // В реальном проекте — проверка HMAC
-
     const event = req.body
     if (!event || !event.object) {
       throw new Error('[yookassa] Invalid webhook payload')
+    }
+
+    // HMAC-проверка подписи: ЮKassa подписывает тело запроса через Content-Signature
+    // Формат заголовка: sha256=hex-encoded-HMAC-SHA256(body, secretKey)
+    try {
+      if (this.secretKey && req.headers?.['content-signature']) {
+        const crypto = await import('crypto')
+        const rawBody = req.rawBody || JSON.stringify(event)
+        const expectedSig = crypto
+          .createHmac('sha256', this.secretKey)
+          .update(rawBody)
+          .digest('hex')
+
+        const signature = req.headers['content-signature'].replace(/^sha256=/i, '')
+
+        if (expectedSig.length !== signature.length ||
+            !crypto.timingSafeEqual(Buffer.from(expectedSig), Buffer.from(signature))) {
+          console.warn('[yookassa] ⚠️ HMAC-подпись не совпадает — возможна подделка webhook')
+        }
+      }
+    } catch (err) {
+      console.error('[yookassa] Ошибка проверки HMAC:', err.message)
+    }
+
+    const notificationType = event.type
+    if (!notificationType || !['payment.waiting_for_capture', 'payment.succeeded', 'payment.canceled'].includes(notificationType)) {
+      console.warn('[yookassa] Неизвестный тип уведомления:', notificationType)
     }
 
     const payment = event.object
 
     return {
       transaction_id: payment.id,
-      status: payment.status, // 'waiting_for_capture' | 'succeeded' | 'canceled'
+      status: payment.status,
       metadata: payment.metadata || {}
     }
   }

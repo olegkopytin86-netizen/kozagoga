@@ -217,6 +217,17 @@ class QueryBuilder {
     return this
   }
 
+  upsert(data: Record<string, any>, options?: { onConflict?: string }) {
+    // POST-запрос для upsert через REST API
+    this.params['_upsert'] = 'true'
+    if (options?.onConflict) {
+      this.params['_on_conflict'] = options.onConflict
+    }
+    // Сохраняем данные и выполняем
+    this._upsertData = data
+    return this
+  }
+
   single() {
     this.isSingle = true
     this.params['limit'] = '1'
@@ -232,8 +243,36 @@ class QueryBuilder {
     }
   }
 
+  private _upsertData: Record<string, any> | null = null
+
   async execute<T = any>(): Promise<{ data: T[] | null; error: string | null; count: number }> {
     try {
+      // Upsert mode — делаем POST с данными
+      if (this.params['_upsert'] && this._upsertData) {
+        const onConflict = this.params['_on_conflict']
+        delete this.params['_upsert']
+        delete this.params['_on_conflict']
+
+        const url = `${API_BASE}/api/rest/v1/${this.table}`
+        const body = {
+          data: this._upsertData,
+          onConflict: onConflict || undefined
+        }
+        const res = await fetch(url, {
+          method: 'PUT',
+          headers: headers(),
+          body: JSON.stringify(body)
+        })
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ error: res.statusText }))
+          return { data: null, error: body.error || `HTTP ${res.status}`, count: 0 }
+        }
+
+        const row = await res.json()
+        return { data: [row], error: null, count: 1 }
+      }
+
       const qs = new URLSearchParams(this.params).toString()
       const url = `${API_BASE}/api/rest/v1/${this.table}${qs ? '?' + qs : ''}`
       const res = await fetch(url, { headers: headers() })

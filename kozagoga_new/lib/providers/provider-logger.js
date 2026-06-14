@@ -23,13 +23,40 @@ export default class ProviderLogger {
   }
 
   /**
+   * Маскирует чувствительные поля в теле запроса/ответа
+   */
+  _maskSensitiveData(body) {
+    if (!body) return body
+    const sensitiveFields = ['password', 'secret', 'token', 'key', 'pin', 'cvv', 'cvc', 'card_number', 'pan', 'number']
+    try {
+      const obj = typeof body === 'string' ? JSON.parse(body) : JSON.parse(JSON.stringify(body))
+      const mask = (o) => {
+        if (!o || typeof o !== 'object') return
+        for (const key of Object.keys(o)) {
+          if (sensitiveFields.some(f => key.toLowerCase().includes(f))) {
+            o[key] = '***'
+          } else if (typeof o[key] === 'object') {
+            mask(o[key])
+          }
+        }
+      }
+      mask(obj)
+      return obj
+    } catch {
+      // Если не JSON — возвращаем как есть
+      return body
+    }
+  }
+
+  /**
    * Обрезает тело до разумного размера (50KB)
    */
   _truncateBody(body) {
     if (!body) return body
-    const str = typeof body === 'string' ? body : JSON.stringify(body)
+    const masked = this._maskSensitiveData(body)
+    const str = typeof masked === 'string' ? masked : JSON.stringify(masked)
     if (str.length > 51200) return str.slice(0, 51200) + '...[truncated]'
-    return body
+    return masked
   }
 
   /**

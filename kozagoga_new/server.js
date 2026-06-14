@@ -17,7 +17,13 @@ const { Pool } = pkg
 
 // ─── Конфигурация ────────────────────────────────────────
 const PORT = process.env.API_PORT || 3001
-const JWT_SECRET = process.env.JWT_SECRET || 'kozagogo-dev-secret-change-in-production'
+const JWT_SECRET = process.env.JWT_SECRET
+
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  console.error('🚨 FATAL: JWT_SECRET не задан или слишком короткий (< 32 символов).')
+  console.error('🚨 Установите сильный JWT_SECRET в .env и перезапустите сервер.')
+  process.exit(1)
+}
 
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
@@ -42,15 +48,82 @@ let servicesCacheTime = 0
 // ─── Express setup ────────────────────────────────────────
 const app = express()
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || true,
+  origin: process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+    : ['http://localhost:5173', 'http://localhost:4173'],
   credentials: true,
 }))
-app.use(express.json())
+// Сохраняем rawBody для HMAC-верификации webhook'ов
+app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { req.rawBody = buf.toString() } }))
+
+// Базовые security headers (работает без helmet)
+app.use(csrfProtection)
+
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('X-XSS-Protection', '0')
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+  // Strict-Transport-Security включать только при HTTPS
+  if (req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  }
+  next()
+})
 
 // ─── Middleware ──────────────────────────────────────────
 
-// Rate limiting (simple in-memory)
+// Простая CSRF-защита для state-changing запросов
+// Проверяем Origin/Referer (SameSite-политика без установки пакетов)
+function csrfProtection(req, res, next) {
+  // Только POST, PUT, DELETE, PATCH
+  if (!['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) return next()
+
+  // Пропускаем webhook'и — они приходят от платёжных систем, а не от браузера
+  if (req.path.startsWith('/api/payments/webhook')) return next()
+
+  const origin = req.headers['origin']
+  const referer = req.headers['referer']
+  const allowedOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+    : ['http://localhost:5173', 'http://localhost:4173']
+
+  // Пропускаем API-to-API запросы (curl, Postman, серверные вызовы)
+  if (!origin && !referer) return next()
+
+  if (origin) {
+    const matches = allowedOrigins.some(allowed => origin.startsWith(allowed))
+    if (!matches) {
+      return res.status(403).json({ error: 'CSRF: Origin not allowed' })
+    }
+  } else if (referer) {
+    const matches = allowedOrigins.some(allowed => referer.startsWith(allowed))
+    if (!matches) {
+      return res.status(403).json({ error: 'CSRF: Referer not allowed' })
+    }
+  }
+  next()
+}
+
+// Rate limiting (simple in-memory with TTL cleanup)
 const rateCounters = new Map()
+const RATE_CLEANUP_INTERVAL = 5 * 60 * 1000 // 5 минут
+
+// Периодическая очистка устаревших записей rate limiter
+setInterval(() => {
+  const now = Date.now()
+  let expired = 0
+  for (const [key, entry] of rateCounters.entries()) {
+    if (now - entry.start > 60000) {
+      rateCounters.delete(key)
+      expired++
+    }
+  }
+  if (expired > 0) {
+    console.log(`[rate-limiter] Очищено ${expired} устаревших записей, всего: ${rateCounters.size}`)
+  }
+}, RATE_CLEANUP_INTERVAL)
+
 function rateLimit(limitPerMin) {
   return (req, res, next) => {
     if (!limitPerMin) return next()
@@ -184,18 +257,30 @@ app.get('/api/services', async (req, res) => {
 
     const allServices = []
     const providers = listProviders()
+    let hasError = false
 
     for (const provider of providers) {
       try {
         const services = await provider.getServices()
         allServices.push(...services.map(s => ({ ...s, provider_code: provider.code })))
       } catch (err) {
+        hasError = true
         console.error(`[${provider.code}] Ошибка получения сервисов:`, err.message)
       }
     }
 
-    servicesCache = allServices
-    servicesCacheTime = Date.now()
+    if (hasError && allServices.length === 0) {
+      // Все провайдеры вернули ошибку — сбрасываем кэш, отдаём 503
+      servicesCache = []
+      servicesCacheTime = 0
+      return res.status(503).json({ error: 'Все провайдеры временно недоступны', cached: false })
+    }
+
+    // Обновляем кэш только при успешном получении хотя бы одного провайдера
+    if (allServices.length > 0) {
+      servicesCache = allServices
+      servicesCacheTime = Date.now()
+    }
 
     res.json(allServices)
   } catch (err) {
@@ -590,8 +675,36 @@ app.post('/api/payments/process', requireAuth, rateLimit(getRateLimits().payment
   }
 })
 
+// Валидация IP для webhook'ов платёжных систем
+const WEBHOOK_ALLOWED_IPS = new Set()
+// Заполняется из .env: SBER_WEBHOOK_IPS, YOOKASSA_WEBHOOK_IPS
+if (process.env.SBER_WEBHOOK_IPS) {
+  process.env.SBER_WEBHOOK_IPS.split(',').forEach(ip => WEBHOOK_ALLOWED_IPS.add(ip.trim()))
+}
+if (process.env.YOOKASSA_WEBHOOK_IPS) {
+  process.env.YOOKASSA_WEBHOOK_IPS.split(',').forEach(ip => WEBHOOK_ALLOWED_IPS.add(ip.trim()))
+}
+
+function webhookIPFilter(allowedEnv) {
+  return (req, res, next) => {
+    const configIPs = process.env[allowedEnv]
+    if (!configIPs) {
+      // Если список не настроен — пропускаем с предупреждением
+      console.warn(`[webhook] ${allowedEnv} не настроен — IP-фильтрация отключена`)
+      return next()
+    }
+    const ips = configIPs.split(',').map(s => s.trim())
+    const clientIP = req.ip || req.connection?.remoteAddress
+    if (ips.includes(clientIP)) {
+      return next()
+    }
+    console.warn(`[webhook] Запрос с неразрешённого IP: ${clientIP}`)
+    return res.status(403).json({ error: 'Forbidden' })
+  }
+}
+
 // FR-37: POST /api/payments/webhook — callback от ЮKassa
-app.post('/api/payments/webhook', async (req, res) => {
+app.post('/api/payments/webhook', webhookIPFilter('YOOKASSA_WEBHOOK_IPS'), async (req, res) => {
   try {
     const gateway = paymentGateways.yookassa
     if (!gateway) return res.status(200).json({ received: true })
@@ -621,7 +734,7 @@ app.post('/api/payments/webhook', async (req, res) => {
 })
 
 // FR-68: POST /api/payments/webhook/sberbank — уведомления от Сбербанка
-app.post('/api/payments/webhook/sberbank', async (req, res) => {
+app.post('/api/payments/webhook/sberbank', webhookIPFilter('SBER_WEBHOOK_IPS'), async (req, res) => {
   try {
     const gateway = paymentGateways.sberbank
     if (!gateway) return res.status(200).json({ received: true })
@@ -1126,8 +1239,10 @@ app.get('/api/rest/v1/:table', async (req, res) => {
     if (order) {
       const parts = order.split('.')
       const col = parts[0]
+      // Белый список допустимых колонок
+      const allowedColumns = ['id', 'name', 'slug', 'price', 'old_price', 'created_at', 'updated_at', 'sort_order', 'rating', 'review_count', 'stock', 'status', 'payment_status', 'amount', 'balance', 'email', 'display_order']
       const dir = parts[1]?.toLowerCase() === 'desc' ? 'DESC' : 'ASC'
-      if (col.match(/^[a-z_]+$/)) {
+      if (allowedColumns.includes(col)) {
         orderSQL = `ORDER BY ${col} ${dir}`
       }
     }
@@ -1176,6 +1291,30 @@ app.put('/api/rest/v1/:table', async (req, res) => {
   const { table } = req.params
   if (!req.user) return res.status(401).json({ error: 'Authentication required' })
 
+  const allowedTables = ['users', 'categories', 'products', 'product_images', 'orders', 'order_items', 'payments', 'reviews', 'wallet_balances', 'wallet_transactions', 'transactions', 'admin_logs']
+  if (!allowedTables.includes(table)) {
+    return res.status(404).json({ error: 'Table not found' })
+  }
+
+  // Upsert mode: { data: {...}, onConflict: 'column' }
+  if (req.body?.data && req.body?.onConflict) {
+    const { data, onConflict } = req.body
+    const keys = Object.keys(data)
+    const values = Object.values(data)
+    const placeholders = keys.map((_, i) => `$${i + 1}`)
+    const columns = keys.join(', ')
+
+    // PostgreSQL INSERT … ON CONFLICT DO UPDATE
+    const exclusions = keys.map(k => `${k} = EXCLUDED.${k}`).join(', ')
+    const query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders.join(', ')})
+      ON CONFLICT (${onConflict}) DO UPDATE SET ${exclusions}
+      RETURNING *`
+
+    const result = await pool.query(query, values)
+    return res.json(result.rows[0])
+  }
+
+  // Regular update mode
   const { id, ...updates } = req.body
   if (!id) return res.status(400).json({ error: 'id is required' })
 
@@ -1197,6 +1336,17 @@ app.delete('/api/rest/v1/:table/:id', async (req, res) => {
   const { table, id } = req.params
   if (!req.user) return res.status(401).json({ error: 'Authentication required' })
 
+  const allowedTables = ['users', 'categories', 'products', 'product_images', 'orders', 'order_items', 'payments', 'reviews', 'wallet_balances', 'wallet_transactions', 'transactions', 'admin_logs']
+  if (!allowedTables.includes(table)) {
+    return res.status(404).json({ error: 'Table not found' })
+  }
+
+  // Валидация UUID для id
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!uuidRegex.test(id)) {
+    return res.status(400).json({ error: 'Invalid id format (UUID expected)' })
+  }
+
   try {
     const result = await pool.query(`DELETE FROM ${table} WHERE id = $1 RETURNING *`, [id])
     res.json(result.rows[0] || { error: 'Not found' })
@@ -1216,8 +1366,8 @@ app.get('/api/health', async (req, res) => {
   }
 })
 
-// ─── Seed endpoint (обновлённый) ──────────────────────────
-app.post('/api/seed', async (req, res) => {
+// ─── Seed endpoint (только для админа) ───────────────────
+app.post('/api/seed', requireAuth, async (req, res) => {
   try {
     await pool.query(`DELETE FROM categories`)
     const catResult = await pool.query(`

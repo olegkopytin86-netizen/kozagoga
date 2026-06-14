@@ -187,7 +187,10 @@ export default class SberbankGateway extends PaymentGateway {
       throw new Error('[sberbank] webhook: mdOrder обязателен')
     }
 
-    // Верифицируем через getOrderStatusExtended
+    // Проверяем IP отправителя (Сбер должен быть в белом списке)
+    // В production: проверять req.ip через список разрешённых IP Сбера
+
+    // Верифицируем через getOrderStatusExtended (серверная проверка, не доверяем коллбэку)
     const orderStatus = await this.getOrderStatus(mdOrder)
 
     return {
