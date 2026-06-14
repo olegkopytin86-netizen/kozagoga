@@ -11,6 +11,7 @@ import { useCart } from "@/contexts/CartContext"
 import { useAuth } from "@/contexts/AuthContext"
 import { createOrder, processPayment } from "@/lib/api"
 import SberPayButton from "@/components/payment/SberPayButton"
+import SberPayForm from "@/components/payment/SberPayForm"
 
 type PaymentMethod = "card" | "sbp" | "sberpay" | "wallet"
 
@@ -23,6 +24,7 @@ export default function Checkout() {
   const [promoError, setPromoError] = useState("")
   const [email, setEmail] = useState(user?.email || "")
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
+  const [phoneNumber, setPhoneNumber] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState("")
   const [isSuccess, setIsSuccess] = useState(false)
@@ -256,6 +258,19 @@ export default function Checkout() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Форма СберПэй — номер телефона + кнопка оплаты */}
+              {paymentMethod === "sberpay" && (
+                <div className="mt-4">
+                  <SberPayForm
+                    phoneNumber={phoneNumber}
+                    onPhoneChange={setPhoneNumber}
+                    onSubmit={handlePayment}
+                    isProcessing={isProcessing}
+                    total={total}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Итого */}
@@ -317,24 +332,26 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  <Button
-                    size="lg"
-                    className="w-full gap-2"
-                    onClick={handlePayment}
-                    disabled={isProcessing || !email}
-                  >
-                    {isProcessing ? (
-                      <>
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        Обработка...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="h-5 w-5" />
-                        Оплатить {formatPrice(total)}
-                      </>
-                    )}
-                  </Button>
+                  {paymentMethod !== "sberpay" && (
+                    <Button
+                      size="lg"
+                      className="w-full gap-2"
+                      onClick={handlePayment}
+                      disabled={isProcessing || !email}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          Обработка...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-5 w-5" />
+                          Оплатить {formatPrice(total)}
+                        </>
+                      )}
+                    </Button>
+                  )}
 
                   <p className="mt-3 text-center text-xs text-muted-foreground">
                     Нажимая «Оплатить», вы соглашаетесь с условиями использования

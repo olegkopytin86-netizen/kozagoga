@@ -32,6 +32,19 @@ export default function SberPayButton({ selected, onClick }: SberPayButtonProps)
         </span>
       </div>
 
+      {/* Стрелка */}
+      <div className="ml-auto">
+        {selected ? (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#21A038" strokeWidth="2.5" strokeLinecap="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        ) : (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        )}
+      </div>
+
       {/* Активное состояние — зелёная галочка */}
       {selected && (
         <div className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#21A038] text-white shadow">
