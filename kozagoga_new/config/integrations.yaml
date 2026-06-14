@@ -44,7 +44,7 @@ payment_gateways:
     primary: sberbank
     fallback: yookassa
   wallet: wallet
-  yoomoney:
+  sberpay:
     primary: sberbank
     fallback: yookassa
 

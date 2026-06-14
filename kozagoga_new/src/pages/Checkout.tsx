@@ -11,7 +11,7 @@ import { useCart } from "@/contexts/CartContext"
 import { useAuth } from "@/contexts/AuthContext"
 import { createOrder, processPayment } from "@/lib/api"
 
-type PaymentMethod = "card" | "sbp" | "yoomoney" | "wallet"
+type PaymentMethod = "card" | "sbp" | "sberpay" | "wallet"
 
 export default function Checkout() {
   const { items, removeItem, updateQuantity, clearCart, subtotal, itemCount } = useCart()
@@ -230,7 +230,7 @@ export default function Checkout() {
                     {[
                       { id: "card" as const, label: "Банковская карта", icon: "💳", desc: "Visa, Mastercard, Мир" },
                       { id: "sbp" as const, label: "СБП", icon: "📱", desc: "Система быстрых платежей" },
-                      { id: "yoomoney" as const, label: "ЮMoney", icon: "💰", desc: "Электронный кошелёк" },
+                      { id: "sberpay" as const, label: "СберПэй", icon: "🏦", desc: "Оплата через СберБанк" },
                       { id: "wallet" as const, label: "Кошелёк", icon: "🏦", desc: "Внутренний счёт" },
                     ].map((method) => (
                       <button

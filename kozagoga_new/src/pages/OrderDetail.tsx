@@ -184,7 +184,7 @@ export default function OrderDetail() {
                   {order.payment_method === "card" ? "Банковская карта" :
                    order.payment_method === "sbp" ? "СБП" :
                    order.payment_method === "wallet" ? "Кошелёк" :
-                   order.payment_method === "yoomoney" ? "ЮMoney" :
+                   order.payment_method === "sberpay" ? "СберПэй" :
                    order.payment_method || "—"}
                 </p>
               </div>

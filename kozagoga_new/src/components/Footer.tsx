@@ -28,7 +28,7 @@ const paymentSystems = [
   { name: "Mastercard", icon: "💳" },
   { name: "Мир", icon: "💳" },
   { name: "СБП", icon: "📱" },
-  { name: "ЮMoney", icon: "💰" },
+  { name: "СберПэй", icon: "🏦" },
   { name: "Qiwi", icon: "⚡" },
 ]
 

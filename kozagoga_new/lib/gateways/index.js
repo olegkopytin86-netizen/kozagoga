@@ -48,7 +48,7 @@ export function initGateways(pool) {
  *       fallback: yookassa
  *     sbp: sberbank   # упрощённая запись
  *
- * @param {string} paymentMethod - card | sbp | wallet | yoomoney
+ * @param {string} paymentMethod - card | sbp | sberpay | wallet
  * @param {object} gateways - map code → instance
  * @returns {{ gateway: object, code: string }}
  */
