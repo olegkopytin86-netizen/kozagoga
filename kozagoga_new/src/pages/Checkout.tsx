@@ -71,38 +71,32 @@ export default function Checkout() {
           const isIOS = /iPhone|iPad|iPod/i.test(ua)
 
           if (isIOS) {
-            // iOS: пробуем Universal Link → App Store → fallback
-            let linkIndex = 0
-            const tryLink = () => {
-              if (linkIndex >= payment.deep_links!.length) {
-                // Все диплинки перебраны — редирект на веб
-                window.location.href = fallbackUrl
+            // iOS: перебор 6 диплинков строго по гайду Сбера
+            // Шаг 1: onlineios-app
+            window.location.href = payment.deep_links[0]
+            // Шаги 2-6: через 50мс пробуем остальные (страница обновляется сама)
+            const iosLinks = payment.deep_links.slice(1)
+            let idx = 0
+            const tryNext = () => {
+              if (idx >= iosLinks.length) {
+                // Все перебраны — лендинг Сбера
+                window.location.href = 'https://www.sberbank.ru/ru/person/payments/online_sberpay'
                 return
               }
-
-              const timeout = setTimeout(() => {
-                // Следующий диплинк
-                linkIndex++
-                tryLink()
-              }, 2000)
-
-              const handleVis = () => {
-                if (document.hidden) {
-                  clearTimeout(timeout)
-                  document.removeEventListener('visibilitychange', handleVis)
-                }
-              }
-              document.addEventListener('visibilitychange', handleVis)
-
-              window.location.href = payment.deep_links![linkIndex]
+              // Обновление страницы для скрытия алерта
+              window.location.href = window.location.href
+              setTimeout(() => {
+                window.location.href = iosLinks[idx]
+                idx++
+                setTimeout(tryNext, 50)
+              }, 50)
             }
-            tryLink()
+            setTimeout(tryNext, 50)
           } else if (/Android/i.test(ua)) {
             // Android: пробуем Intent → Web fallback
             const timeout = setTimeout(() => {
               window.location.href = fallbackUrl
             }, 2500)
-
             const handleVisibility = () => {
               if (document.hidden) {
                 clearTimeout(timeout)
@@ -110,7 +104,6 @@ export default function Checkout() {
               }
             }
             document.addEventListener('visibilitychange', handleVisibility)
-
             window.location.href = payment.deep_links[0]
           } else {
             // Десктоп — сразу веб

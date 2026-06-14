@@ -151,13 +151,20 @@ export default class SberbankGateway extends PaymentGateway {
     if (process.env.SBER_DEMO_MODE === 'true') {
       console.log(`[sberbank] 🧪 ДЕМО: создание платежа ${orderNumber} на сумму ${amount}`)
       await new Promise(r => setTimeout(r, 1500)) // имитация задержки
+      // Формируем параметры для диплинков по гайду Сбера
+      const bankInvoiceId = `demo-inv-${order_id}`.slice(0, 36)
+      const dlParams = `bankInvoiceId=${bankInvoiceId}&orderNumber=${orderNumber}`
+
       return {
         redirect_url: return_url || this.returnUrl,
         deep_links: [
-          // iOS — универсальная ссылка (Universal Link), открывает приложение если установлено
-          `sberbank://payment?order=${orderNumber}&amount=${this._toKop(amount)}`,
-          // iOS — fallback на App Store если приложение не установлено
-          `https://apps.apple.com/ru/app/%D1%81%D0%B1%D0%B5%D1%80%D0%B1%D0%B0%D0%BD%D0%BA-%D0%BE%D0%BD%D0%BB%D0%B0%D0%B9%D0%BD/id492224193`,
+          // iOS — строгий порядок из гайда Сбера
+          `onlineios-app://sbolpay/invoicing/v2?${dlParams}`,
+          `startonline://sbolpay/invoicing/v2?${dlParams}`,
+          `onlineappmobile://sbolpay/invoicing/v2?${dlParams}`,
+          `budgetonline-ios://sbolpay/invoicing/v2?${dlParams}`,
+          `btripsexpenses://sbolpay/invoicing/v2?${dlParams}`,
+          `ios-app-smartonline://sbolpay/invoicing/v2?${dlParams}`,
         ],
         transaction_id: `demo-${order_id}`,
         status: 'pending',
@@ -189,18 +196,34 @@ export default class SberbankGateway extends PaymentGateway {
 
     // Если заказ уже существует — возвращаем что есть
     if (err?.existing) {
+      const dlParams = `bankInvoiceId=${data.orderId || orderId}&orderNumber=${orderNumber}`
       return {
         redirect_url: data.formUrl || null,
+        deep_links: [
+          `onlineios-app://sbolpay/invoicing/v2?${dlParams}`,
+          `startonline://sbolpay/invoicing/v2?${dlParams}`,
+          `onlineappmobile://sbolpay/invoicing/v2?${dlParams}`,
+          `budgetonline-ios://sbolpay/invoicing/v2?${dlParams}`,
+          `btripsexpenses://sbolpay/invoicing/v2?${dlParams}`,
+          `ios-app-smartonline://sbolpay/invoicing/v2?${dlParams}`,
+        ],
         transaction_id: data.orderId,
         status: 'pending',
       }
     }
 
+    // Формируем диплинки для iOS по гайду Сбера
+    const dlParams = `bankInvoiceId=${data.orderId || orderId}&orderNumber=${orderNumber}`
+
     return {
       redirect_url: data.formUrl,
       deep_links: [
-        `sberbank://payment?order=${orderNumber}&amount=${params.amount}`,
-        `https://apps.apple.com/ru/app/%D1%81%D0%B1%D0%B5%D1%80%D0%B1%D0%B0%D0%BD%D0%BA-%D0%BE%D0%BD%D0%BB%D0%B0%D0%B9%D0%BD/id492224193`,
+        `onlineios-app://sbolpay/invoicing/v2?${dlParams}`,
+        `startonline://sbolpay/invoicing/v2?${dlParams}`,
+        `onlineappmobile://sbolpay/invoicing/v2?${dlParams}`,
+        `budgetonline-ios://sbolpay/invoicing/v2?${dlParams}`,
+        `btripsexpenses://sbolpay/invoicing/v2?${dlParams}`,
+        `ios-app-smartonline://sbolpay/invoicing/v2?${dlParams}`,
       ],
       transaction_id: data.orderId,
       status: 'pending',
