@@ -11,7 +11,6 @@ import { useCart } from "@/contexts/CartContext"
 import { useAuth } from "@/contexts/AuthContext"
 import { createOrder, processPayment } from "@/lib/api"
 import SberPayButton from "@/components/payment/SberPayButton"
-import SberPayForm from "@/components/payment/SberPayForm"
 
 type PaymentMethod = "card" | "sbp" | "sberpay" | "wallet"
 
@@ -259,18 +258,7 @@ export default function Checkout() {
                 </CardContent>
               </Card>
 
-              {/* Форма СберПэй — номер телефона + кнопка оплаты */}
-              {paymentMethod === "sberpay" && (
-                <div className="mt-4">
-                  <SberPayForm
-                    phoneNumber={phoneNumber}
-                    onPhoneChange={setPhoneNumber}
-                    onSubmit={handlePayment}
-                    isProcessing={isProcessing}
-                    total={total}
-                  />
-                </div>
-              )}
+
             </div>
 
             {/* Итого */}
@@ -332,7 +320,31 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  {paymentMethod !== "sberpay" && (
+                  {paymentMethod === "sberpay" ? (
+                    <button
+                      onClick={handlePayment}
+                      disabled={isProcessing || !email}
+                      style={{ backgroundColor: '#21A038' }}
+                      className="flex w-full items-center justify-center gap-3 rounded-full py-4 text-lg font-bold text-white shadow-md transition-all hover:brightness-110 hover:shadow-lg active:brightness-90 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4 31.4" strokeLinecap="round" />
+                          </svg>
+                          Обработка...
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20">
+                            <span className="text-xs font-bold text-white">С</span>
+                          </div>
+                          <span>Оплатить</span>
+                          <span className="font-bold tracking-wide">Pay</span>
+                        </>
+                      )}
+                    </button>
+                  ) : (
                     <Button
                       size="lg"
                       className="w-full gap-2"
