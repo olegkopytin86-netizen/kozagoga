@@ -62,8 +62,40 @@ export default function Checkout() {
       const payment = await processPayment(order.id, paymentMethod)
 
       if (payment.redirect_url) {
-        // Редирект на платёжную страницу шлюза
-        window.location.href = payment.redirect_url
+        // Для СберПэй — перебор диплинков перед редиректом
+        if (payment.deep_links && payment.deep_links.length > 0) {
+          // Пытаемся открыть диплинк в мобильное приложение Сбера
+          const link = payment.deep_links[0]
+          const fallbackUrl = payment.redirect_url
+
+          // На мобильных устройствах — пытаемся открыть приложение
+          const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+          if (isMobile) {
+            // Пробуем диплинк, если приложение не открылось — редирект на веб
+            const timeout = setTimeout(() => {
+              window.location.href = fallbackUrl
+            }, 2500)
+
+            // Прячем таймер если страница скрыта (приложение открылось)
+            const handleVisibility = () => {
+              if (document.hidden) {
+                clearTimeout(timeout)
+                document.removeEventListener('visibilitychange', handleVisibility)
+              }
+            }
+            document.addEventListener('visibilitychange', handleVisibility)
+
+            // Пробуем открыть приложение
+            window.location.href = link
+          } else {
+            // На десктопе — сразу веб-версия
+            window.location.href = fallbackUrl
+          }
+        } else {
+          // Обычный редирект (карты, СБП)
+          window.location.href = payment.redirect_url
+        }
         return
       }
 

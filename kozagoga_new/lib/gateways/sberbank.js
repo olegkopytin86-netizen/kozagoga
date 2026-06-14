@@ -153,6 +153,9 @@ export default class SberbankGateway extends PaymentGateway {
       await new Promise(r => setTimeout(r, 1500)) // имитация задержки
       return {
         redirect_url: return_url || this.returnUrl,
+        deep_links: [
+          `sberbank://payment?order=${orderNumber}&amount=${this._toKop(amount)}`,
+        ],
         transaction_id: `demo-${order_id}`,
         status: 'pending',
       }
@@ -192,6 +195,9 @@ export default class SberbankGateway extends PaymentGateway {
 
     return {
       redirect_url: data.formUrl,
+      deep_links: [
+        `sberbank://payment?order=${orderNumber}&amount=${params.amount}`,
+      ],
       transaction_id: data.orderId,
       status: 'pending',
     }
