@@ -154,7 +154,10 @@ export default class SberbankGateway extends PaymentGateway {
       return {
         redirect_url: return_url || this.returnUrl,
         deep_links: [
+          // iOS — универсальная ссылка (Universal Link), открывает приложение если установлено
           `sberbank://payment?order=${orderNumber}&amount=${this._toKop(amount)}`,
+          // iOS — fallback на App Store если приложение не установлено
+          `https://apps.apple.com/ru/app/%D1%81%D0%B1%D0%B5%D1%80%D0%B1%D0%B0%D0%BD%D0%BA-%D0%BE%D0%BD%D0%BB%D0%B0%D0%B9%D0%BD/id492224193`,
         ],
         transaction_id: `demo-${order_id}`,
         status: 'pending',
@@ -197,6 +200,7 @@ export default class SberbankGateway extends PaymentGateway {
       redirect_url: data.formUrl,
       deep_links: [
         `sberbank://payment?order=${orderNumber}&amount=${params.amount}`,
+        `https://apps.apple.com/ru/app/%D1%81%D0%B1%D0%B5%D1%80%D0%B1%D0%B0%D0%BD%D0%BA-%D0%BE%D0%BD%D0%BB%D0%B0%D0%B9%D0%BD/id492224193`,
       ],
       transaction_id: data.orderId,
       status: 'pending',

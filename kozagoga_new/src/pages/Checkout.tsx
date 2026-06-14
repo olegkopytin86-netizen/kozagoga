@@ -64,20 +64,45 @@ export default function Checkout() {
       if (payment.redirect_url) {
         // Для СберПэй — перебор диплинков перед редиректом
         if (payment.deep_links && payment.deep_links.length > 0) {
-          // Пытаемся открыть диплинк в мобильное приложение Сбера
-          const link = payment.deep_links[0]
           const fallbackUrl = payment.redirect_url
 
-          // На мобильных устройствах — пытаемся открыть приложение
-          const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+          // Определяем платформу
+          const ua = navigator.userAgent
+          const isIOS = /iPhone|iPad|iPod/i.test(ua)
 
-          if (isMobile) {
-            // Пробуем диплинк, если приложение не открылось — редирект на веб
+          if (isIOS) {
+            // iOS: пробуем Universal Link → App Store → fallback
+            let linkIndex = 0
+            const tryLink = () => {
+              if (linkIndex >= payment.deep_links!.length) {
+                // Все диплинки перебраны — редирект на веб
+                window.location.href = fallbackUrl
+                return
+              }
+
+              const timeout = setTimeout(() => {
+                // Следующий диплинк
+                linkIndex++
+                tryLink()
+              }, 2000)
+
+              const handleVis = () => {
+                if (document.hidden) {
+                  clearTimeout(timeout)
+                  document.removeEventListener('visibilitychange', handleVis)
+                }
+              }
+              document.addEventListener('visibilitychange', handleVis)
+
+              window.location.href = payment.deep_links![linkIndex]
+            }
+            tryLink()
+          } else if (/Android/i.test(ua)) {
+            // Android: пробуем Intent → Web fallback
             const timeout = setTimeout(() => {
               window.location.href = fallbackUrl
             }, 2500)
 
-            // Прячем таймер если страница скрыта (приложение открылось)
             const handleVisibility = () => {
               if (document.hidden) {
                 clearTimeout(timeout)
@@ -86,10 +111,9 @@ export default function Checkout() {
             }
             document.addEventListener('visibilitychange', handleVisibility)
 
-            // Пробуем открыть приложение
-            window.location.href = link
+            window.location.href = payment.deep_links[0]
           } else {
-            // На десктопе — сразу веб-версия
+            // Десктоп — сразу веб
             window.location.href = fallbackUrl
           }
         } else {
