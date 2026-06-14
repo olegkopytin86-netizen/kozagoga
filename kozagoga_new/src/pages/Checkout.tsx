@@ -328,7 +328,7 @@ export default function Checkout() {
                   {paymentMethod === "sberpay" ? (
                     <button
                       onClick={handlePayment}
-                      disabled={isProcessing || !email}
+                      disabled={isProcessing}
                       style={{ backgroundColor: '#21A038' }}
                       className="flex w-full items-center justify-center gap-3 rounded-full py-4 text-lg font-bold text-white shadow-md transition-all hover:brightness-110 hover:shadow-lg active:brightness-90 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
                     >
