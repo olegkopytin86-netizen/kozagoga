@@ -91,13 +91,21 @@ function csrfProtection(req, res, next) {
   // Пропускаем API-to-API запросы (curl, Postman, серверные вызовы)
   if (!origin && !referer) return next()
 
+  // Динамически добавляем текущий Host как разрешённый (работает для туннелей)
+  const host = req.headers['host']
+  const allAllowed = [...allowedOrigins]
+  if (host) {
+    // Туннель расшифровывает HTTPS, nginx видит HTTP — добавляем оба
+    allAllowed.push(`https://${host}`, `http://${host}`)
+  }
+
   if (origin) {
-    const matches = allowedOrigins.some(allowed => origin.startsWith(allowed))
+    const matches = allAllowed.some(allowed => origin.startsWith(allowed))
     if (!matches) {
       return res.status(403).json({ error: 'CSRF: Origin not allowed' })
     }
   } else if (referer) {
-    const matches = allowedOrigins.some(allowed => referer.startsWith(allowed))
+    const matches = allAllowed.some(allowed => referer.startsWith(allowed))
     if (!matches) {
       return res.status(403).json({ error: 'CSRF: Referer not allowed' })
     }
