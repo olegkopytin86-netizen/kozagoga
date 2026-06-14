@@ -227,6 +227,12 @@ export default function Checkout() {
               <Card>
                 <CardContent className="p-4">
                   <h2 className="mb-4 text-lg font-semibold">Способ оплаты</h2>
+                  {/* Фирменная кнопка СберПэй — над остальными способами */}
+                  <SberPayButton
+                    selected={paymentMethod === "sberpay"}
+                    onClick={() => setPaymentMethod("sberpay")}
+                  />
+
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
                     {[
                       { id: "card" as const, label: "Банковская карта", icon: "💳", desc: "Visa, Mastercard, Мир" },
@@ -247,11 +253,6 @@ export default function Checkout() {
                         <div className="text-xs text-muted-foreground">{method.desc}</div>
                       </button>
                     ))}
-                    {/* Фирменная кнопка СберПэй */}
-                    <SberPayButton
-                      selected={paymentMethod === "sberpay"}
-                      onClick={() => setPaymentMethod("sberpay")}
-                    />
                   </div>
                 </CardContent>
               </Card>

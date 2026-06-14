@@ -1,5 +1,6 @@
-// SberPayButton — официальная кнопка СберПэй в стиле Сбера
-// Формат: белая/светлая плашка с логотипом СберПэй, зелёной галочкой при выборе
+// SberPayButton — официальная кнопка СберПэй (по гайду Сбера)
+// Текст: «Оплатите заказ в СберБанк Онлайн»
+// Расположение: над другими способами оплаты
 
 interface SberPayButtonProps {
   selected: boolean
@@ -11,30 +12,25 @@ export default function SberPayButton({ selected, onClick }: SberPayButtonProps)
     <button
       onClick={onClick}
       className={`
-        relative flex flex-col items-center justify-center rounded-xl border-2 p-4 text-left transition-all
+        relative flex items-center gap-4 rounded-2xl border-2 p-4 transition-all w-full
         ${selected
           ? "border-[#21A038] bg-[#E8F5E9] ring-2 ring-[#21A038]/20"
           : "border-gray-200 bg-white hover:border-[#21A038]/30 hover:shadow-sm"
         }
       `}
     >
-      {/* Логотип СберПэй — зелёный круг с "С" + текст */}
-      <div className="mb-2 flex items-center gap-2">
-        {/* Зелёный круг с "С" */}
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#21A038] shadow-sm">
-          <span className="text-sm font-bold text-white">С</span>
-        </div>
-        {/* Надпись СберПэй фирменным шрифтом/цветом */}
-        <div className="flex flex-col items-start leading-tight">
-          <span className="text-base font-bold tracking-tight text-[#21A038]">СберПэй</span>
-          <span className="text-[10px] text-gray-400 font-medium tracking-wider uppercase">SberPay</span>
-        </div>
+      {/* Логотип СберПэй — зелёный круг с "С" */}
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#21A038] shadow-sm">
+        <span className="text-lg font-bold text-white tracking-tight">С</span>
       </div>
 
-      {/* Описание */}
-      <span className="text-xs text-gray-500 text-center leading-snug">
-        Платите онлайн через<br />СберБанк Онлайн
-      </span>
+      {/* Текстовый блок */}
+      <div className="flex flex-col items-start text-left">
+        <span className="text-base font-bold text-[#21A038]">СберПэй</span>
+        <span className="text-sm text-gray-500 leading-snug">
+          Оплатите заказ в СберБанк Онлайн
+        </span>
+      </div>
 
       {/* Активное состояние — зелёная галочка */}
       {selected && (
