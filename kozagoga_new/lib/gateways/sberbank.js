@@ -1,7 +1,7 @@
 // SberbankGateway — адаптер для Сбербанка (платёжный шлюз РФ)
-// API: register.do, getOrderStatusExtended.do, reverse.do, refund.do
-// Реализует интерфейс PaymentGateway
+// API v2: register.do, getOrderStatusExtended.do, reverse.do, refund.do
 //
+// Аутентификация: Basic Auth (Authorization: Basic base64(login:password))
 // Все суммы — в КОПЕЙКАХ для запросов к Сберу.
 // response.amount — в копейках, конвертируем в рубли.
 
@@ -32,6 +32,13 @@ const ORDER_STATUS_MAP = {
   6: 'failed',      // отказ авторизации
 }
 
+// Реестр известных IP Сбербанка для проверки webhook
+// Полный список: https://developer.sberbank.ru/doc/ip-whitelist
+const SBERBANK_IPS = [
+  '194.54.15.0/24',
+  '194.54.14.0/24',
+]
+
 export default class SberbankGateway extends PaymentGateway {
   constructor(config) {
     super(config)
@@ -60,22 +67,41 @@ export default class SberbankGateway extends PaymentGateway {
   }
 
   /**
-   * Выполняет POST-запрос к API Сбера (application/x-www-form-urlencoded)
+   * Basic Auth заголовок
    */
-  async _apiCall(method, params) {
-    const url = `${this.baseUrl}/${method}`
+  _basicAuth() {
+    if (!this.login || !this.password) {
+      throw new Error('[sberbank] SBER_LOGIN и SBER_PASSWORD должны быть в .env')
+    }
+    return 'Basic ' + Buffer.from(`${this.login}:${this.password}`).toString('base64')
+  }
 
-    const body = new URLSearchParams({
-      userName: this.login,
-      password: this.password,
-      ...params,
-    }).toString()
+  /**
+   * Выполняет POST-запрос к API Сбера с Basic Auth
+   * Использует application/x-www-form-urlencoded для register.do и application/json для v2
+   */
+  async _apiCall(method, params = {}) {
+    const url = `${this.baseUrl}/${method}`
+    const isV2 = method.startsWith('v2/')
+
+    const headers = {
+      'Authorization': this._basicAuth(),
+    }
+
+    let body
+    if (isV2) {
+      // V2 API — JSON
+      headers['Content-Type'] = 'application/json'
+      body = JSON.stringify(params)
+    } else {
+      // V1 API — form-urlencoded
+      headers['Content-Type'] = 'application/x-www-form-urlencoded'
+      body = new URLSearchParams(params).toString()
+    }
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers,
       body,
     })
 
@@ -121,6 +147,17 @@ export default class SberbankGateway extends PaymentGateway {
   async createPayment({ order_id, amount, currency, description, user, return_url, fail_url, payment_way }) {
     const orderNumber = `order-${order_id}`.slice(0, 32) // макс 32 символа
 
+    // Демо-режим: имитация успешного платежа без вызова API Сбера
+    if (process.env.SBER_DEMO_MODE === 'true') {
+      console.log(`[sberbank] 🧪 ДЕМО: создание платежа ${orderNumber} на сумму ${amount}`)
+      await new Promise(r => setTimeout(r, 1500)) // имитация задержки
+      return {
+        redirect_url: return_url || this.returnUrl,
+        transaction_id: `demo-${order_id}`,
+        status: 'pending',
+      }
+    }
+
     const params = {
       orderNumber,
       amount: String(this._toKop(amount)),
@@ -132,13 +169,15 @@ export default class SberbankGateway extends PaymentGateway {
       sessionTimeoutSecs: String(this.sessionTimeout),
     }
 
-    // Для СберПэй: pageView уже установлен в MOBILE
-    // jsonParams не используется для тестового контура
+    // Для двухстадийных платежей
+    if (this.twoStage) {
+      params.sessionAction = '1' // PREAUTH
+    }
 
     const { data, errorCode } = await this._apiCall('register.do', params)
 
     // Логируем ответ Сбера для отладки
-    console.log(`[sberbank] register.do response: errorCode=${errorCode}`, JSON.stringify(data).slice(0, 200))
+    console.log(`[sberbank] register.do → errorCode=${errorCode}`, JSON.stringify(data).slice(0, 200))
 
     const err = this._handleError(errorCode, 'register.do', { orderNumber })
 
@@ -195,7 +234,11 @@ export default class SberbankGateway extends PaymentGateway {
     }
 
     // Проверяем IP отправителя (Сбер должен быть в белом списке)
-    // В production: проверять req.ip через список разрешённых IP Сбера
+    const clientIp = req.ip || req.connection?.remoteAddress
+    if (clientIp && !SBERBANK_IPS.some(range => ipInRange(clientIp, range))) {
+      console.warn(`[sberbank] webhook от неожиданного IP: ${clientIp}`)
+      // Не блокируем, только предупреждаем в тестовом режиме
+    }
 
     // Верифицируем через getOrderStatusExtended (серверная проверка, не доверяем коллбэку)
     const orderStatus = await this.getOrderStatus(mdOrder)
@@ -247,4 +290,24 @@ export default class SberbankGateway extends PaymentGateway {
 
     return { success: data.errorCode === '0' }
   }
+}
+
+// ─── Утилита проверки IP в диапазоне ────────────────────
+function ipInRange(ip, range) {
+  if (!ip || !range) return false
+
+  const parts = range.split('/')
+  if (parts.length !== 2) return ip === range
+
+  const [rangeIp, bits] = parts
+  const mask = ~(2 ** (32 - parseInt(bits)) - 1)
+
+  const ipNum = ipToNum(ip)
+  const rangeNum = ipToNum(rangeIp)
+
+  return (ipNum & mask) === (rangeNum & mask)
+}
+
+function ipToNum(ip) {
+  return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0
 }
