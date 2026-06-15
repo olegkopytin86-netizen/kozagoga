@@ -197,10 +197,19 @@ export default class HyperionProvider extends BaseProvider {
 
   async validate(req) {
     const info = {}
-    if (req.params && req.fields) {
-      for (const field of req.fields) {
-        if (!field.is_main_requisite && req.params[field.key]) {
-          info[field.key] = req.params[field.key]
+
+    if (req.params) {
+      if (req.fields) {
+        // Если передана схема полей — фильтруем только неосновные
+        for (const field of req.fields) {
+          if (!field.is_main_requisite && req.params[field.key]) {
+            info[field.key] = req.params[field.key]
+          }
+        }
+      } else {
+        // Если схема не передана — передаём все params как доп.инфо
+        for (const [key, value] of Object.entries(req.params)) {
+          info[key] = value
         }
       }
     }

@@ -34,7 +34,7 @@ const pool = new Pool({
 })
 
 // ─── Инициализация модулей интеграций ──────────────────
-import { getConfig, getPollingConfig, getPaymentGatewayMapping, getRateLimits } from './lib/config-loader.js'
+import { getConfig, getPollingConfig, getPaymentGatewayMapping, getRateLimits, getPaymentConfig } from './lib/config-loader.js'
 import { initProviders, getProvider, listProviders } from './lib/providers/index.js'
 import { initGateways, resolveGateway } from './lib/gateways/index.js'
 
@@ -282,6 +282,15 @@ app.get('/api/services', async (req, res) => {
       servicesCache = []
       servicesCacheTime = 0
       return res.status(503).json({ error: 'Все провайдеры временно недоступны', cached: false })
+    }
+
+    // Фикс max_length для Optima 3 (сервис 1039) — Hyperion отдаёт 10, реальный реквизит 16 символов
+    for (const svc of allServices) {
+      if (svc.id === '1039') {
+        for (const field of svc.fields) {
+          if (field.max_length === 10) field.max_length = 16
+        }
+      }
     }
 
     // Обновляем кэш только при успешном получении хотя бы одного провайдера
@@ -1366,6 +1375,38 @@ app.delete('/api/rest/v1/:table/:id', async (req, res) => {
 })
 
 // ─── Health check ─────────────────────────────────────────
+app.get('/api/config/payment', async (req, res) => {
+  const cfg = getPaymentConfig()
+  res.json({ confirmation_timeout_sec: cfg.confirmation_timeout_sec || 10 })
+})
+
+// Комбинированный статус подтверждения (Sber + Hyperion)
+app.get('/api/confirm-status/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params
+    const result = await pool.query(
+      `SELECT id, payment_status, status, provider_status, provider_code, updated_at FROM orders WHERE id = $1`,
+      [orderId]
+    )
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Заказ не найден' })
+    }
+    const row = result.rows[0]
+    const isSberConfirmed = row.payment_status === 'paid'
+    const isHyperionConfirmed = row.status === 'paid' || row.provider_status === 'COMPLETE'
+    res.json({
+      order_id: row.id,
+      payment_status: row.payment_status,
+      order_status: row.status,
+      provider_status: row.provider_status,
+      confirmed: isSberConfirmed && isHyperionConfirmed,
+    })
+  } catch (err) {
+    console.error('GET /api/confirm-status error:', err)
+    res.status(500).json({ error: 'Ошибка проверки статуса' })
+  }
+})
+
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT 1')

@@ -1,7 +1,7 @@
 // SberbankGateway — адаптер для Сбербанка (платёжный шлюз РФ)
-// API v2: register.do, getOrderStatusExtended.do, reverse.do, refund.do
+// ECOM API v1: register.do, getOrderStatusExtended.do, reverse.do, refund.do
 //
-// Аутентификация: Basic Auth (Authorization: Basic base64(login:password))
+// Аутентификация: userName + password в теле JSON-запроса
 // Все суммы — в КОПЕЙКАХ для запросов к Сберу.
 // response.amount — в копейках, конвертируем в рубли.
 
@@ -67,36 +67,24 @@ export default class SberbankGateway extends PaymentGateway {
   }
 
   /**
-   * Basic Auth заголовок
-   */
-  _basicAuth() {
-    if (!this.login || !this.password) {
-      throw new Error('[sberbank] SBER_LOGIN и SBER_PASSWORD должны быть в .env')
-    }
-    return 'Basic ' + Buffer.from(`${this.login}:${this.password}`).toString('base64')
-  }
-
-  /**
-   * Выполняет POST-запрос к API Сбера с Basic Auth
-   * Использует application/x-www-form-urlencoded для register.do и application/json для v2
+   * Выполняет POST-запрос к API Сбера
+   * Аутентификация: userName + password в теле JSON
    */
   async _apiCall(method, params = {}) {
     const url = `${this.baseUrl}/${method}`
-    const isV2 = method.startsWith('v2/')
+
+    // Добавляем аутентификацию в тело запроса
+    if (!this.login || !this.password) {
+      throw new Error('[sberbank] SBER_LOGIN и SBER_PASSWORD должны быть в .env')
+    }
+    const body = JSON.stringify({
+      userName: this.login,
+      password: this.password,
+      ...params,
+    })
 
     const headers = {
-      'Authorization': this._basicAuth(),
-    }
-
-    let body
-    if (isV2) {
-      // V2 API — JSON
-      headers['Content-Type'] = 'application/json'
-      body = JSON.stringify(params)
-    } else {
-      // V1 API — form-urlencoded
-      headers['Content-Type'] = 'application/x-www-form-urlencoded'
-      body = new URLSearchParams(params).toString()
+      'Content-Type': 'application/json',
     }
 
     const response = await fetch(url, {
@@ -173,13 +161,13 @@ export default class SberbankGateway extends PaymentGateway {
 
     const params = {
       orderNumber,
-      amount: String(this._toKop(amount)),
+      amount: this._toKop(amount),
       currency: '643', // RUB
       returnUrl: return_url || this.returnUrl,
       failUrl: fail_url || this.failUrl,
       description: description || `Заказ #${order_id}`,
       pageView: payment_way === 'sberpay' ? 'MOBILE' : 'DESKTOP',
-      sessionTimeoutSecs: String(this.sessionTimeout),
+      sessionTimeoutSecs: this.sessionTimeout,
     }
 
     // Для двухстадийных платежей
@@ -212,19 +200,29 @@ export default class SberbankGateway extends PaymentGateway {
       }
     }
 
-    // Формируем диплинки для iOS по гайду Сбера
-    const dlParams = `bankInvoiceId=${data.orderId || orderId}&orderNumber=${orderNumber}`
+    // Формируем диплинки: сначала sbolDeepLink от API Сбера, затем fallback'и
+    const bankInvoiceId = data.orderId || orderId
+    const apiDeepLink = data.externalParams?.sbolDeepLink
+    const dlParams = `bankInvoiceId=${bankInvoiceId}&orderNumber=${orderNumber}`
+
+    const deep_links = []
+    // Приоритет: sbolDeepLink от API, затем гайд Сбера
+    if (apiDeepLink) {
+      // Извлекаем bankInvoiceId из sbolDeepLink и чистим от дублей
+      deep_links.push(apiDeepLink)
+    }
+    deep_links.push(
+      `onlineios-app://sbolpay/invoicing/v2?${dlParams}`,
+      `startonline://sbolpay/invoicing/v2?${dlParams}`,
+      `onlineappmobile://sbolpay/invoicing/v2?${dlParams}`,
+      `budgetonline-ios://sbolpay/invoicing/v2?${dlParams}`,
+      `btripsexpenses://sbolpay/invoicing/v2?${dlParams}`,
+      `ios-app-smartonline://sbolpay/invoicing/v2?${dlParams}`
+    )
 
     return {
       redirect_url: data.formUrl,
-      deep_links: [
-        `onlineios-app://sbolpay/invoicing/v2?${dlParams}`,
-        `startonline://sbolpay/invoicing/v2?${dlParams}`,
-        `onlineappmobile://sbolpay/invoicing/v2?${dlParams}`,
-        `budgetonline-ios://sbolpay/invoicing/v2?${dlParams}`,
-        `btripsexpenses://sbolpay/invoicing/v2?${dlParams}`,
-        `ios-app-smartonline://sbolpay/invoicing/v2?${dlParams}`,
-      ],
+      deep_links,
       transaction_id: data.orderId,
       status: 'pending',
     }
@@ -292,7 +290,7 @@ export default class SberbankGateway extends PaymentGateway {
 
     // Сумма опциональна: если не указана — полный возврат
     if (amount !== undefined && amount !== null) {
-      params.amount = String(this._toKop(amount))
+      params.amount = this._toKop(amount)
     }
 
     const { data, errorCode } = await this._apiCall('refund.do', params)

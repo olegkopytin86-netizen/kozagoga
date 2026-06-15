@@ -60,6 +60,10 @@ retry:
   backoff_strategy: exponential
   backoff_multiplier: 2
 
+# --- Таймаут ожидания подтверждения платежа (сек) ---
+payment:
+  confirmation_timeout_sec: 10
+
 # --- Rate limiting ---
 rate_limits:
   validate: 60

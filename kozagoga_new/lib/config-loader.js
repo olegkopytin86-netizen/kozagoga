@@ -67,6 +67,11 @@ export function getRateLimits() {
   return getConfig().rate_limits || {}
 }
 
+/** Payment config */
+export function getPaymentConfig() {
+  return getConfig().payment || { confirmation_timeout_sec: 10 }
+}
+
 /** Hot-reload */
 export function enableHotReload() {
   watchFile(CONFIG_PATH, (curr, prev) => {
