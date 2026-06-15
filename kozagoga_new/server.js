@@ -721,6 +721,51 @@ function webhookIPFilter(allowedEnv) {
   }
 }
 
+// ─── Авто-триггер доставки услуги после подтверждения платежа ─────
+async function triggerProviderFulfillment(orderId) {
+  try {
+    const itemsRes = await pool.query('SELECT * FROM order_items WHERE order_id = $1', [orderId])
+    const items = itemsRes.rows
+    const providerItems = items.filter(i => i.provider_code)
+    if (providerItems.length === 0) return
+
+    for (const item of providerItems) {
+      try {
+        const provider = getProvider(item.provider_code)
+        if (!provider) continue
+
+        const txResult = await provider.pay({
+          bearer: item.provider_service_id,
+          account: item.product_name,
+          amount: item.price,
+          currency: 'KGS',
+          exclude_commission: true,
+          info: []
+        })
+
+        await pool.query(
+          `INSERT INTO transactions (order_id, order_item_id, provider_code, provider_transaction_id, provider_service_id, operation, amount, request_body, response_body, status)
+           VALUES ($1, $2, $3, $4, $5, 'payment', $6, $7, $8, 'pending')`,
+          [orderId, item.id, item.provider_code, txResult.package_id, item.provider_service_id, item.price,
+           '{}', JSON.stringify(txResult)]
+        )
+
+        await pool.query(
+          `UPDATE orders SET provider_transaction_id = $1, provider_status = 'processing', status = 'processing', updated_at = now() WHERE id = $2 AND provider_transaction_id IS NULL`,
+          [txResult.package_id, orderId]
+        )
+
+        startPolling(orderId, txResult.package_id, provider, item)
+        console.log(`[fulfillment] ✅ Доставка запущена для заказа ${orderId}, item ${item.id}`)
+      } catch (err) {
+        console.error(`[fulfillment] Ошибка для item ${item.id}:`, err.message)
+      }
+    }
+  } catch (err) {
+    console.error('[fulfillment] Ошибка получения товаров:', err.message)
+  }
+}
+
 // FR-37: POST /api/payments/webhook — callback от ЮKassa
 app.post('/api/payments/webhook', webhookIPFilter('YOOKASSA_WEBHOOK_IPS'), async (req, res) => {
   try {
@@ -778,6 +823,9 @@ app.post('/api/payments/webhook/sberbank', webhookIPFilter('SBER_WEBHOOK_IPS'), 
           `UPDATE payments SET status = 'paid' WHERE gateway_tx_id = $1`,
           [result.transaction_id]
         )
+
+        // E2E: автоматически запускаем доставку услуги провайдеру
+        triggerProviderFulfillment(orderId)
       }
     }
 
@@ -1111,12 +1159,34 @@ function startPolling(orderId, packageId, provider, item) {
 
       if (['FAILURE', 'CANCELLED', 'UNEXPECTED_ERROR'].includes(status.provider_status)) {
         clearInterval(activeTimer)
+        console.log(`[polling] ❌ Заказ ${orderId} отменён провайдером: ${status.provider_status}`)
+
+        // Возвращаем деньги через платёжный шлюз
+        try {
+          const payRes = await pool.query(
+            'SELECT * FROM payments WHERE order_id = $1 AND status = $2 LIMIT 1',
+            [orderId, 'paid']
+          )
+          if (payRes.rows.length > 0) {
+            const payment = payRes.rows[0]
+            const gateway = paymentGateways[payment.gateway]
+            if (gateway && gateway.refundPayment) {
+              await gateway.refundPayment(payment.gateway_tx_id, null)
+              await pool.query(
+                `UPDATE payments SET status = 'refunded' WHERE id = $1`,
+                [payment.id]
+              )
+              console.log(`[polling] 💰 Возврат выполнен для платежа ${payment.id}`)
+            }
+          }
+        } catch (refundErr) {
+          console.error(`[polling] Ошибка возврата для заказа ${orderId}:`, refundErr.message)
+        }
+
         await pool.query(
-          `UPDATE orders SET provider_status = $1, status = 'cancelled', updated_at = now() WHERE id = $2`,
+          `UPDATE orders SET provider_status = $1, status = 'cancelled', payment_status = 'refunded', updated_at = now() WHERE id = $2`,
           [status.provider_status, orderId]
         )
-        console.log(`[polling] ❌ Заказ ${orderId} отменён: ${status.provider_status}`)
-        // Здесь должен быть вызов refund
         return
       }
 
