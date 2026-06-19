@@ -155,6 +155,161 @@ export default function createAdminTransactionsRouter(pool, audit) {
     }
   })
 
+  // ─── GET /api/admin/transactions/export — CSV-экспорт ─
+  router.get('/export', async (req, res) => {
+    try {
+      // Копируем фильтры из списка
+      const { date_from, date_to, provider_status, order_status, provider_code } = req.query
+
+      let query = `
+        SELECT
+          o.id as order_id,
+          o.status as order_status,
+          o.total,
+          o.payment_status,
+          o.payment_method,
+          o.created_at,
+          u.email as user_email,
+          t.provider_code,
+          t.provider_status,
+          t.provider_transaction_id,
+          t.gateway_tx_id,
+          t.gateway_code,
+          t.amount,
+          t.currency,
+          t.commission,
+          t.refund_amount
+        FROM orders o
+        LEFT JOIN users u ON u.id = o.user_id
+        LEFT JOIN transactions t ON t.order_id = o.id
+      `
+      const params = []
+      const conditions = []
+      let idx = 1
+
+      if (date_from) { conditions.push(`o.created_at >= $${idx++}`); params.push(date_from) }
+      if (date_to) { conditions.push(`o.created_at <= $${idx++}`); params.push(date_to) }
+      if (provider_status) {
+        const statuses = provider_status.split(',')
+        const placeholders = statuses.map(() => `$${idx++}`).join(',')
+        conditions.push(`t.provider_status IN (${placeholders})`)
+        params.push(...statuses)
+      }
+      if (order_status) {
+        const statuses = order_status.split(',')
+        const placeholders = statuses.map(() => `$${idx++}`).join(',')
+        conditions.push(`o.status IN (${placeholders})`)
+        params.push(...statuses)
+      }
+      if (provider_code) { conditions.push(`t.provider_code = $${idx++}`); params.push(provider_code) }
+
+      if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ')
+      }
+      query += ' ORDER BY o.created_at DESC LIMIT 10000'
+
+      const result = await pool.query(query, params)
+
+      // Build CSV
+      const headers = [
+        'order_id', 'status', 'total', 'payment_status', 'payment_method',
+        'created_at', 'user_email', 'provider', 'provider_status',
+        'provider_tx_id', 'gateway_tx_id', 'gateway', 'amount', 'currency',
+        'commission', 'refund_amount',
+      ]
+
+      // UTF-8 BOM for Excel русской локали
+      const BOM = '\uFEFF'
+      const csvRows = [headers.join(',')]
+
+      for (const row of result.rows) {
+        csvRows.push(headers.map(h => {
+          const val = row[h] ?? ''
+          const str = String(val).replace(/"/g, '""')
+          return /[,"\n]/.test(str) ? `"${str}"` : str
+        }).join(','))
+      }
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+      res.setHeader('Content-Disposition', `attachment; filename="transactions-${new Date().toISOString().slice(0, 10)}.csv"`)
+      res.send(BOM + csvRows.join('\n'))
+    } catch (err) {
+      console.error('[admin-transactions] Export error:', err)
+      res.status(500).json({ error: 'Ошибка экспорта' })
+    }
+  })
+
+  // ─── GET /api/admin/transactions/stats — статистика ─
+  router.get('/stats', async (req, res) => {
+    try {
+      const { date_from, date_to, period = 'day' } = req.query
+
+      const params = []
+      let idx = 1
+      const conditions = []
+
+      if (date_from) { conditions.push(`o.created_at >= $${idx++}`); params.push(date_from) }
+      if (date_to) { conditions.push(`o.created_at <= $${idx++}`); params.push(date_to) }
+
+      const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : ''
+
+      // Total counts
+      const totals = await pool.query(`
+        SELECT
+          COUNT(*) as total_orders,
+          COUNT(*) FILTER (WHERE o.status IN ('paid', 'completed')) as successful,
+          COUNT(*) FILTER (WHERE o.status = 'cancelled') as cancelled,
+          COUNT(*) FILTER (WHERE o.status = 'pending') as pending,
+          COUNT(*) FILTER (WHERE o.payment_status = 'refunded') as refunded,
+          COALESCE(SUM(o.total) FILTER (WHERE o.status IN ('paid', 'completed')), 0) as revenue
+        FROM orders o
+        ${where}
+      `, params)
+
+      // By day/period
+      const dateTrunc = period === 'hour' ? "date_trunc('hour', o.created_at)"
+        : period === 'week' ? "date_trunc('week', o.created_at)"
+        : "date_trunc('day', o.created_at)"
+
+      const byPeriod = await pool.query(`
+        SELECT
+          ${dateTrunc} as date,
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE o.status IN ('paid', 'completed')) as successful,
+          COUNT(*) FILTER (WHERE o.status = 'cancelled') as failed,
+          COALESCE(SUM(o.total) FILTER (WHERE o.status IN ('paid', 'completed')), 0) as revenue
+        FROM orders o
+        ${where}
+        GROUP BY 1
+        ORDER BY 1 ASC
+        LIMIT 365
+      `, params)
+
+      // By provider
+      const byProvider = await pool.query(`
+        SELECT
+          COALESCE(t.provider_code, 'unknown') as provider,
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE t.provider_status = 'COMPLETE') as completed,
+          COUNT(*) FILTER (WHERE t.provider_status = 'FAILURE') as failed
+        FROM orders o
+        LEFT JOIN transactions t ON t.order_id = o.id
+        ${where}
+        GROUP BY t.provider_code
+        ORDER BY total DESC
+      `, params)
+
+      res.json({
+        totals: totals.rows[0],
+        by_period: byPeriod.rows,
+        by_provider: byProvider.rows,
+      })
+    } catch (err) {
+      console.error('[admin-transactions] Stats error:', err)
+      res.status(500).json({ error: 'Ошибка получения статистики' })
+    }
+  })
+
   // ─── GET /api/admin/transactions/:id — детали ──────
   router.get('/:id', async (req, res) => {
     try {
@@ -322,161 +477,6 @@ export default function createAdminTransactionsRouter(pool, audit) {
     } catch (err) {
       console.error('[admin-transactions] Force complete error:', err)
       res.status(500).json({ error: 'Ошибка принудительного завершения' })
-    }
-  })
-
-  // ─── GET /api/admin/transactions/export — CSV-экспорт
-  router.get('/export', async (req, res) => {
-    try {
-      // Копируем фильтры из списка
-      const { date_from, date_to, provider_status, order_status, provider_code } = req.query
-
-      let query = `
-        SELECT
-          o.id as order_id,
-          o.status as order_status,
-          o.total,
-          o.payment_status,
-          o.payment_method,
-          o.created_at,
-          u.email as user_email,
-          t.provider_code,
-          t.provider_status,
-          t.provider_transaction_id,
-          t.gateway_tx_id,
-          t.gateway_code,
-          t.amount,
-          t.currency,
-          t.commission,
-          t.refund_amount
-        FROM orders o
-        LEFT JOIN users u ON u.id = o.user_id
-        LEFT JOIN transactions t ON t.order_id = o.id
-      `
-      const params = []
-      const conditions = []
-      let idx = 1
-
-      if (date_from) { conditions.push(`o.created_at >= $${idx++}`); params.push(date_from) }
-      if (date_to) { conditions.push(`o.created_at <= $${idx++}`); params.push(date_to) }
-      if (provider_status) {
-        const statuses = provider_status.split(',')
-        const placeholders = statuses.map(() => `$${idx++}`).join(',')
-        conditions.push(`t.provider_status IN (${placeholders})`)
-        params.push(...statuses)
-      }
-      if (order_status) {
-        const statuses = order_status.split(',')
-        const placeholders = statuses.map(() => `$${idx++}`).join(',')
-        conditions.push(`o.status IN (${placeholders})`)
-        params.push(...statuses)
-      }
-      if (provider_code) { conditions.push(`t.provider_code = $${idx++}`); params.push(provider_code) }
-
-      if (conditions.length > 0) {
-        query += ' WHERE ' + conditions.join(' AND ')
-      }
-      query += ' ORDER BY o.created_at DESC LIMIT 10000'
-
-      const result = await pool.query(query, params)
-
-      // Build CSV
-      const headers = [
-        'order_id', 'status', 'total', 'payment_status', 'payment_method',
-        'created_at', 'user_email', 'provider', 'provider_status',
-        'provider_tx_id', 'gateway_tx_id', 'gateway', 'amount', 'currency',
-        'commission', 'refund_amount',
-      ]
-
-      // UTF-8 BOM for Excel русской локали
-      const BOM = '\uFEFF'
-      const csvRows = [headers.join(',')]
-
-      for (const row of result.rows) {
-        csvRows.push(headers.map(h => {
-          const val = row[h] ?? ''
-          const str = String(val).replace(/"/g, '""')
-          return /[,"\n]/.test(str) ? `"${str}"` : str
-        }).join(','))
-      }
-
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
-      res.setHeader('Content-Disposition', `attachment; filename="transactions-${new Date().toISOString().slice(0, 10)}.csv"`)
-      res.send(BOM + csvRows.join('\n'))
-    } catch (err) {
-      console.error('[admin-transactions] Export error:', err)
-      res.status(500).json({ error: 'Ошибка экспорта' })
-    }
-  })
-
-  // ─── GET /api/admin/transactions/stats — статистика ─
-  router.get('/stats', async (req, res) => {
-    try {
-      const { date_from, date_to, period = 'day' } = req.query
-
-      const params = []
-      let idx = 1
-      const conditions = []
-
-      if (date_from) { conditions.push(`o.created_at >= $${idx++}`); params.push(date_from) }
-      if (date_to) { conditions.push(`o.created_at <= $${idx++}`); params.push(date_to) }
-
-      const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : ''
-
-      // Total counts
-      const totals = await pool.query(`
-        SELECT
-          COUNT(*) as total_orders,
-          COUNT(*) FILTER (WHERE o.status IN ('paid', 'completed')) as successful,
-          COUNT(*) FILTER (WHERE o.status = 'cancelled') as cancelled,
-          COUNT(*) FILTER (WHERE o.status = 'pending') as pending,
-          COUNT(*) FILTER (WHERE o.payment_status = 'refunded') as refunded,
-          COALESCE(SUM(o.total) FILTER (WHERE o.status IN ('paid', 'completed')), 0) as revenue
-        FROM orders o
-        ${where}
-      `, params)
-
-      // By day/period
-      const dateTrunc = period === 'hour' ? "date_trunc('hour', o.created_at)"
-        : period === 'week' ? "date_trunc('week', o.created_at)"
-        : "date_trunc('day', o.created_at)"
-
-      const byPeriod = await pool.query(`
-        SELECT
-          ${dateTrunc} as date,
-          COUNT(*) as total,
-          COUNT(*) FILTER (WHERE o.status IN ('paid', 'completed')) as successful,
-          COUNT(*) FILTER (WHERE o.status = 'cancelled') as failed,
-          COALESCE(SUM(o.total) FILTER (WHERE o.status IN ('paid', 'completed')), 0) as revenue
-        FROM orders o
-        ${where}
-        GROUP BY 1
-        ORDER BY 1 ASC
-        LIMIT 365
-      `, params)
-
-      // By provider
-      const byProvider = await pool.query(`
-        SELECT
-          COALESCE(t.provider_code, 'unknown') as provider,
-          COUNT(*) as total,
-          COUNT(*) FILTER (WHERE t.provider_status = 'COMPLETE') as completed,
-          COUNT(*) FILTER (WHERE t.provider_status = 'FAILURE') as failed
-        FROM orders o
-        LEFT JOIN transactions t ON t.order_id = o.id
-        ${where}
-        GROUP BY t.provider_code
-        ORDER BY total DESC
-      `, params)
-
-      res.json({
-        totals: totals.rows[0],
-        by_period: byPeriod.rows,
-        by_provider: byProvider.rows,
-      })
-    } catch (err) {
-      console.error('[admin-transactions] Stats error:', err)
-      res.status(500).json({ error: 'Ошибка получения статистики' })
     }
   })
 

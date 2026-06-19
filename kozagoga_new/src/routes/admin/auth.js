@@ -156,6 +156,7 @@ function tryRefreshToken(req, res, next) {
 function requireAdminRole(...roles) {
   return (req, res, next) => {
     if (!req.admin) {
+      console.log('[admin-auth] requireAdminRole FAIL:', req.method, req.path, 'admin=', req.admin, 'cookies=', req.cookies?.[COOKIE_NAME_TOKEN]?.substring(0, 20))
       return res.status(401).json({ error: 'Не авторизован' })
     }
 

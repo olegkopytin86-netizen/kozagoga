@@ -926,66 +926,10 @@ app.post('/api/payments/reverse', requireRole('admin'), async (req, res) => {
 // ═══════════════════════════════════════════════════════════
 
 // GET /api/admin/transactions — расширенные логи транзакций провайдеров
-app.get('/api/admin/transactions', requireRole('admin'), async (req, res) => {
-  try {
-    const { limit = 100, offset = 0, provider_code, operation, status } = req.query
-
-    let where = []
-    let params = []
-    let idx = 1
-
-    if (provider_code) {
-      where.push(`provider_code = $${idx++}`)
-      params.push(provider_code)
-    }
-    if (operation) {
-      where.push(`operation = $${idx++}`)
-      params.push(operation)
-    }
-    if (status) {
-      where.push(`status = $${idx++}`)
-      params.push(status)
-    }
-
-    const whereSQL = where.length > 0 ? 'WHERE ' + where.join(' AND ') : ''
-
-    const result = await pool.query(
-      `SELECT id, provider_code, operation, url, http_method,
-              request_body, request_headers,
-              response_body, response_headers,
-              duration_ms, status, provider_status, error, description,
-              amount, currency, provider_transaction_id,
-              created_at, updated_at
-       FROM transactions ${whereSQL}
-       ORDER BY created_at DESC
-       LIMIT $${idx++} OFFSET $${idx++}`,
-      [...params, parseInt(limit), parseInt(offset)]
-    )
-
-    res.json({
-      total: result.rows.length,
-      rows: result.rows
-    })
-  } catch (err) {
-    console.error('GET /api/admin/transactions error:', err)
-    res.status(500).json({ error: 'Ошибка получения логов' })
-  }
-})
-
-// GET /api/admin/transactions/export — экспорт в JSON (для скачивания)
-app.get('/api/admin/transactions/export', requireRole('admin'), async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT * FROM transactions ORDER BY created_at DESC LIMIT 1000`
-    )
-    res.setHeader('Content-Type', 'application/json')
-    res.setHeader('Content-Disposition', 'attachment; filename=transactions-export.json')
-    res.json(result.rows)
-  } catch (err) {
-    console.error('GET /api/admin/transactions/export error:', err)
-    res.status(500).json({ error: 'Ошибка экспорта' })
-  }
-})
+// ═══ Устаревшие admin-эндпоинты — удалены ═══
+// Заменены модулями src/routes/admin/*
+// Для списка транзакций: GET /api/admin/transactions (новый)
+// Для экспорта: GET /api/admin/transactions/export (новый)
 
 // ═══════════════════════════════════════════════════════════
 // WALLET OPERATIONS
