@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import pkg from 'pg'
 import dotenv from 'dotenv'
+import cookieParser from 'cookie-parser'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 
@@ -173,6 +174,7 @@ function authenticate(req, res, next) {
     next()
   }
 }
+app.use(cookieParser())
 app.use(authenticate)
 
 function requireRole(...roles) {
@@ -1518,6 +1520,64 @@ app.post('/api/seed', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Seed failed' })
   }
 })
+
+// ═══════════════════════════════════════════════════════════
+// ADMIN PANEL: Маршруты личного кабинета администратора
+// ═══════════════════════════════════════════════════════════
+
+import { createAuditMiddleware } from './src/lib/admin/audit.js'
+import createAdminAuthRouter, {
+  authenticateAdmin,
+  requireAdminRole,
+  csrfProtectionMiddleware,
+  COOKIE_NAME_CSRF,
+} from './src/routes/admin/auth.js'
+import createAdminCategoriesRouter from './src/routes/admin/categories.js'
+import createAdminProductsRouter from './src/routes/admin/products.js'
+import createAdminTransactionsRouter from './src/routes/admin/transactions.js'
+import createAdminUsersRouter from './src/routes/admin/users.js'
+
+// Создаём admin middleware + роутеры
+const adminAudit = createAuditMiddleware(pool)
+const adminAuthRouter = createAdminAuthRouter(pool)
+const adminCategoriesRouter = createAdminCategoriesRouter(pool, adminAudit)
+const adminProductsRouter = createAdminProductsRouter(pool, adminAudit)
+const adminTransactionsRouter = createAdminTransactionsRouter(pool, adminAudit)
+const adminUsersRouter = createAdminUsersRouter(pool, adminAudit)
+
+// Admin middleware: аутентификация через httpOnly cookie (все /api/admin/*)
+app.use('/api/admin', authenticateAdmin)
+
+// Admin auth (login/logout — без CSRF, публичные для админки)
+app.use('/api/admin/auth', adminAuthRouter)
+
+// Все остальные admin-роуты — с CSRF-защитой и проверкой роли
+app.use('/api/admin/categories',
+  csrfProtectionMiddleware,
+  requireAdminRole('admin', 'superadmin'),
+  adminCategoriesRouter
+)
+
+app.use('/api/admin/products',
+  csrfProtectionMiddleware,
+  requireAdminRole('admin', 'superadmin'),
+  adminProductsRouter
+)
+
+app.use('/api/admin/transactions',
+  csrfProtectionMiddleware,
+  requireAdminRole('operator', 'admin', 'superadmin'),
+  adminTransactionsRouter
+)
+
+app.use('/api/admin/users',
+  csrfProtectionMiddleware,
+  requireAdminRole('superadmin'),
+  adminUsersRouter
+)
+
+// Audit middleware — логирует все state-changing admin-запросы
+app.use('/api/admin', adminAudit)
 
 // ─── Запуск ───────────────────────────────────────────────
 async function start() {

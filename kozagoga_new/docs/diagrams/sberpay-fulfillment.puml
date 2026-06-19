@@ -1,0 +1,229 @@
+@startuml SberPay — Полный поток платежа и доставки услуги
+skinparam backgroundColor transparent
+skinparam sequenceMessageAlign center
+skinparam BoxPadding 10
+
+title Полный поток: SberPay → Сбер → Webhook → Hyperion доставка
+
+' ─── Акторы ────────────────────────────────────────
+actor "Пользователь" as User
+actor "СберБанк Онлайн" as SberApp #Green
+
+' ─── Участники ──────────────────────────────────────
+box "Frontend (React + Vite)" #LightBlue
+  participant "ServiceForm" as Form
+  participant "SberPayButton" as PayBtn
+end box
+
+box "Backend (Express)" #LightYellow
+  participant "/api/orders" as CreateOrder
+  participant "/api/payments/process" as ProcessPay
+  participant "/api/confirm-status" as ConfirmStatus
+  participant "SberbankGateway\n(register.do)" as SberGW
+  participant "/api/payments/webhook/sberbank" as SberWebhook
+  participant "triggerProvider\nFulfillment()" as Fulfill
+end box
+
+box "Provider (Hyperion)" #LightCoral
+  participant "HyperionProvider" as Hyperion
+end box
+
+box "PostgreSQL" #LightGray
+  database "База данных" as DB
+end box
+
+' ══════════════════════════════════════════════════════
+' ШАГ 1: Создание заказа
+' ══════════════════════════════════════════════════════
+== 1. Создание заказа и оплаты ==
+
+Form -> CreateOrder: POST /api/orders\n{ items, payment_method }
+CreateOrder -> DB: BEGIN TX
+CreateOrder -> DB: SELECT products (расчёт суммы)
+CreateOrder -> DB: INSERT orders (pending, pending)
+CreateOrder -> DB: INSERT order_items
+CreateOrder -> DB: COMMIT
+CreateOrder --> Form: { id, total, items }
+
+Form -> ProcessPay: POST /api/payments/process\n{ order_id, payment_method }
+ProcessPay -> DB: SELECT orders (проверка статуса)
+ProcessPay -> SberGW: resolveGateway(method,\ngateways)
+SberGW -> SberGW: register.do\n{ orderNumber, amount(коп), returnUrl, failUrl }
+note right SberGW
+  Параметры:
+  - userName/password в теле
+  - 643 (RUB)
+  - pageView = 'MOBILE'
+  - sessionTimeoutSecs
+end note
+SberGW --> ProcessPay: { formUrl, orderId, sbolDeepLink? }
+
+ProcessPay -> DB: INSERT payments\n(gateway_tx_id, method, status)
+ProcessPay --> Form: { redirect_url, deep_links, transaction_id }
+
+' ══════════════════════════════════════════════════════
+' ШАГ 2: Цепочка диплинков (Mobile)
+' ══════════════════════════════════════════════════════
+== 2. Deep Link Chain (только mobile) ==
+
+Form -> Form: sessionStorage.setItem('sber_deeplinks')
+Form -> Form: window.location = dl[0]
+
+group Цепочка диплинков [dlStep=0..6]
+  Form -> SberApp: onlineios-app://sbolpay/…\nили startonline://…
+  SberApp -> SberApp: Пользователь подтверждает платёж
+  SberApp -> SberGW: (внутренняя коммуникация Сбера)
+  SberApp --> User: ✅ Успех / ❌ Отказ
+  alt Приложение открылось
+    User -> SberApp: Подтверждение (blur → перехват)
+    SberApp --> Form: Redirect с ?paymentConfirm=ORDER_ID
+    Form -> Form: startWaiting(orderId)
+  else Не открылось (6 шагов)
+    Form -> Form: "Проверьте приложение"\nstartWaiting(orderId)
+  end
+end
+
+' ══════════════════════════════════════════════════════
+' ШАГ 3: Ожидание + Polling
+' ══════════════════════════════════════════════════════
+== 3. Polling /api/confirm-status ==
+
+loop Каждые 2 сек, макс N сек (из конфига)
+  Form -> ConfirmStatus: GET /api/confirm-status/{orderId}
+  ConfirmStatus -> DB: SELECT orders (payment_status, provider_status)
+  ConfirmStatus --> Form: { confirmed: bool, payment_status, provider_status }
+  alt confirmed === true
+    Form -> Form: ✅ Успех (оба подтверждены)
+  else Таймаут
+    Form -> Form: ⏰ Таймаут → / (главная)
+  end
+end
+
+' ══════════════════════════════════════════════════════
+' ШАГ 4: Webhook от Сбера (Server-to-Server)
+' ══════════════════════════════════════════════════════
+== 4. Webhook от Сбера ==
+
+SberGW ->> SberWebhook: POST /api/payments/webhook/sberbank\n{ mdOrder, operation, status }
+
+SberWebhook -> SberWebhook: IP filter (SBER_WEBHOOK_IPS)
+SberWebhook -> SberGW: processWebhook(req)
+SberGW -> SberGW: getOrderStatusExtended.do(orderId)\n(серверная верификация, не доверяем коллбэку)
+note right SberGW
+  errorCode -> ERROR_MAP (BRD 2.7.7):
+  0/proceed, 4/alert_admin, 5/error_client,
+  7/retry_3x_or_alert, 8/proceed_existing
+end note
+SberGW --> SberWebhook: { status: 'paid', raw_status: 2 }
+
+alt payment_status == 'paid'
+  SberWebhook -> DB: UPDATE orders SET payment_status='paid', status='paid'
+  SberWebhook -> DB: UPDATE payments SET status='paid'
+
+  note right #FFD700: #commit-fix: Авто-триггер доставки услуги после подтверждения платежа
+  SberWebhook -> Fulfill: triggerProviderFulfillment(orderId)
+  Fulfill -> DB: SELECT order_items (фильтр: provider_code)
+end
+
+SberWebhook --> SberGW: { received: true }
+
+' ══════════════════════════════════════════════════════
+' ШАГ 5: Доставка услуги -> Hyperion
+' ══════════════════════════════════════════════════════
+== 5. Доставка услуги через Hyperion ==
+
+loop Для каждого товара с provider_code
+  Fulfill -> Hyperion: provider.pay()
+  note right Hyperion
+    request: POST /api/webhub/Process
+    operation = 'payment'
+    { bearer, account, amount, currency: KGS, info: [] }
+    Header: Bearer {token}
+  end note
+  Hyperion -> Hyperion: ensureAuth() (если 401 -> re-login)
+  Hyperion --> Fulfill: { package_id }
+
+  Fulfill -> DB: INSERT transactions\n(payment, package_id, provider_code)
+  Fulfill -> DB: UPDATE orders SET provider_transaction_id,\nprovider_status='processing'
+
+  Fulfill -> Fulfill: startPolling(orderId, packageId)
+end
+
+' ══════════════════════════════════════════════════════
+' ШАГ 6: Active Polling (5 sec)
+' ══════════════════════════════════════════════════════
+== 6. Active Polling Hyperion (max 24 попыток x 5 сек) ==
+
+loop Active: каждые 5 сек, макс 24 раза
+  Fulfill -> Hyperion: provider.status(packageId)
+
+  note right Hyperion
+    operation = 'status_enquiry'
+    { package_id }
+  end note
+
+  Hyperion --> Fulfill: { provider_status, transaction_state }
+
+  Fulfill -> DB: UPDATE transactions SET provider_status
+
+  alt status == 'COMPLETE' или 'REBOOKED'
+    Fulfill -> DB: UPDATE orders SET status='completed'
+    note right #Green: УСПЕХ
+    break
+  else status == 'FAILURE' | 'CANCELLED' | 'UNEXPECTED_ERROR'
+    Fulfill -> SberGW: gateway.refundPayment()
+    note right #Orange
+      Автоматический возврат
+      средств при отказе
+      провайдера
+    end note
+    Fulfill -> DB: UPDATE orders SET status='cancelled', payment_status='refunded'
+    SberGW -> SberGW: refund.do(orderId, amount?)
+    SberGW --> Fulfill: { status: 'succeeded' }
+    note right #Red: ОТКАЗ + ВОЗВРАТ
+    break
+  end
+end
+
+' ══════════════════════════════════════════════════════
+' ШАГ 7: Background Polling (если active исчерпан)
+' ══════════════════════════════════════════════════════
+== 7. Background Polling (раз в час, макс 24 часа) ==
+
+alt Active polling исчерпан (24 попытки)
+  Fulfill -> Fulfill: startBackgroundPolling()
+
+  loop Каждый час, макс 24 часа
+    Fulfill -> Hyperion: provider.status(packageId)
+    Fulfill -> DB: UPDATE transactions
+
+    alt status == 'COMPLETE'
+      Fulfill -> DB: UPDATE orders SET status='completed'
+      note right #Green: Долгожданный успех
+      break
+    else status == 'FAILURE' или 'CANCELLED'
+      note right #Red: Финальный отказ
+      break
+    end
+  end
+
+  alt Таймаут 24 часа
+    Fulfill -> DB: INSERT admin_logs\n(pending_transaction, alert)
+    note right #Red
+      Создаётся алерт для
+      ручного вмешательства
+    end note
+  end
+end
+
+' ══════════════════════════════════════════════════════
+' ШАГ 8: Финальный статус (Client)
+' ══════════════════════════════════════════════════════
+== 8. Клиент получает финальный статус ==
+
+Form -> ConfirmStatus: GET /api/confirm-status/{orderId}
+ConfirmStatus -> DB: SELECT orders
+ConfirmStatus --> Form: { confirmed: true, provider_status: 'COMPLETE' }
+Form -> Form: Успех (галочка)
+
+@enduml
