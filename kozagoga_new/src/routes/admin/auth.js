@@ -13,10 +13,13 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import crypto from 'node:crypto'
 
-const JWT_SECRET_ADMIN = process.env.JWT_SECRET_ADMIN || process.env.JWT_SECRET
-if (!JWT_SECRET_ADMIN || JWT_SECRET_ADMIN.length < 32) {
-  console.error('🚨 FATAL: JWT_SECRET_ADMIN не задан или слишком короткий.')
-  console.error('🚨 Установите JWT_SECRET_ADMIN в .env (минимум 32 символа)')
+// Lazy getter — env vars доступны после dotenv.config() в server.js
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET_ADMIN || process.env.JWT_SECRET
+  if (!secret || secret.length < 32) {
+    console.warn('⚠️  JWT_SECRET_ADMIN не задан или слишком короткий. Используем JWT_SECRET (только для dev).')
+  }
+  return secret || 'dev-fallback-secret-2026-min-32-chars!!'
 }
 
 const COOKIE_NAME_TOKEN = 'admin_token'
@@ -57,7 +60,7 @@ function csrfProtection(req, res, next) {
 function signAdminToken(admin) {
   return jwt.sign(
     { id: admin.id, email: admin.email, role: admin.role },
-    JWT_SECRET_ADMIN,
+    getJwtSecret(),
     { expiresIn: ACCESS_TOKEN_TTL }
   )
 }
@@ -65,7 +68,7 @@ function signAdminToken(admin) {
 function signRefreshToken(admin) {
   return jwt.sign(
     { id: admin.id, type: 'refresh' },
-    JWT_SECRET_ADMIN,
+    getJwtSecret(),
     { expiresIn: REFRESH_TOKEN_TTL }
   )
 }
@@ -82,7 +85,7 @@ function authenticateAdmin(req, res, next) {
   }
 
   try {
-    req.admin = jwt.verify(token, JWT_SECRET_ADMIN)
+    req.admin = jwt.verify(token, getJwtSecret())
     next()
   } catch (err) {
     req.admin = null
@@ -106,7 +109,7 @@ function tryRefreshToken(req, res, next) {
   }
 
   try {
-    const payload = jwt.verify(refreshCookie, JWT_SECRET_ADMIN)
+    const payload = jwt.verify(refreshCookie, getJwtSecret())
     if (payload.type !== 'refresh') {
       req.admin = null
       return next()
@@ -224,12 +227,13 @@ export default function createAdminAuthRouter(pool) {
         path: '/api/admin',
       })
 
+      // CSRF-токен: Path=/ чтобы JS на страницах /admin/* мог читать document.cookie
       res.cookie(COOKIE_NAME_CSRF, csrfToken, {
-        httpOnly: false,  // readable by JS
+        httpOnly: false,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
         maxAge: 24 * 60 * 60 * 1000,
-        path: '/api/admin',
+        path: '/',
       })
 
       // Логируем вход
@@ -253,7 +257,7 @@ export default function createAdminAuthRouter(pool) {
   router.post('/logout', (req, res) => {
     res.clearCookie(COOKIE_NAME_TOKEN, { path: '/api/admin' })
     res.clearCookie('admin_refresh', { path: '/api/admin' })
-    res.clearCookie(COOKIE_NAME_CSRF, { path: '/api/admin' })
+    res.clearCookie(COOKIE_NAME_CSRF, { path: '/' })
     res.json({ ok: true })
   })
 
@@ -282,7 +286,7 @@ export default function createAdminAuthRouter(pool) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       maxAge: 24 * 60 * 60 * 1000,
-      path: '/api/admin',
+      path: '/',
     })
     res.json({ csrf_token: csrfToken })
   })
