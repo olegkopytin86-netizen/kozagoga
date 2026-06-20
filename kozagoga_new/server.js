@@ -193,6 +193,10 @@ function authenticate(req, res, next) {
 app.use(cookieParser())
 app.use(authenticate)
 
+// System logger — должен быть ПОСЛЕ authenticate (чтобы был req.user), но ДО всех роутов
+const sysLogger = createSystemLogger(pool)
+app.use(sysLogger)
+
 function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: 'Не авторизован' })
@@ -1665,10 +1669,6 @@ app.use('/api/admin/config',
   requireAdminRole('admin', 'superadmin'),
   adminConfigRouter
 )
-
-// System logger middleware
-const sysLogger = createSystemLogger(pool)
-app.use(sysLogger)
 
 // Audit middleware — логирует все state-changing admin-запросы
 app.use('/api/admin', adminAudit)

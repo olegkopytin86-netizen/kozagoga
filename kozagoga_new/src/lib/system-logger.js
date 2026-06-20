@@ -44,10 +44,19 @@ export function createSystemLogger(pool) {
     res.on('finish', () => {
       const duration = Date.now() - start
 
-      // Только ошибки и медленные запросы (> 5 сек)
-      if (res.statusCode >= 400 || duration > 5000) {
+      // Логируем все запросы, сэмплинг для успешных быстрых
+      // Пропускаем healthcheck (шум)
+      const skipPaths = ['/api/health', '/favicon', '/assets/', '/src/']
+      if (skipPaths.some(p => req.path.startsWith(p))) return
+
+      // Для успешных быстрых запросов — сэмплинг 5%
+      const isHealthy = res.statusCode < 400 && duration < 1000
+      if (isHealthy && Math.random() > 0.05) return
+
+      if (true) {
+        const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info'
         log(
-          res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info',
+          level,
           'http',
           `${req.method} ${req.path} → ${res.statusCode} (${duration}ms)`,
           {
