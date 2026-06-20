@@ -1589,6 +1589,8 @@ import createAdminCategoriesRouter from './src/routes/admin/categories.js'
 import createAdminProductsRouter from './src/routes/admin/products.js'
 import createAdminTransactionsRouter from './src/routes/admin/transactions.js'
 import createAdminUsersRouter from './src/routes/admin/users.js'
+import createAdminLogsRouter from './src/routes/admin/logs.js'
+import createAdminConfigRouter from './src/routes/admin/config.js'
 
 // Создаём admin middleware + роутеры
 const adminAudit = createAuditMiddleware(pool)
@@ -1597,6 +1599,8 @@ const adminCategoriesRouter = createAdminCategoriesRouter(pool, adminAudit)
 const adminProductsRouter = createAdminProductsRouter(pool, adminAudit)
 const adminTransactionsRouter = createAdminTransactionsRouter(pool, adminAudit)
 const adminUsersRouter = createAdminUsersRouter(pool, adminAudit)
+const adminLogsRouter = createAdminLogsRouter(pool)
+const adminConfigRouter = createAdminConfigRouter(pool, adminAudit)
 
 // Admin middleware: аутентификация через httpOnly cookie (все /api/admin/*)
 app.use('/api/admin', authenticateAdmin)
@@ -1629,19 +1633,11 @@ app.use('/api/admin/users',
   adminUsersRouter
 )
 
-// Admin logs
-import createAdminLogsRouter from './src/routes/admin/logs.js'
-const adminLogsRouter = createAdminLogsRouter(pool)
-
 app.use('/api/admin/logs',
   csrfProtectionMiddleware,
   requireAdminRole('operator', 'admin', 'superadmin'),
   adminLogsRouter
 )
-
-// Admin config
-import createAdminConfigRouter from './src/routes/admin/config.js'
-const adminConfigRouter = createAdminConfigRouter(pool, adminAudit)
 
 app.use('/api/admin/config',
   csrfProtectionMiddleware,
