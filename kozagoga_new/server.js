@@ -1668,7 +1668,7 @@ app.use('/api/admin/config',
 
 // System logger middleware
 const sysLogger = createSystemLogger(pool)
-app.use(sysLogger.middleware)
+app.use(sysLogger)
 
 // Audit middleware — логирует все state-changing admin-запросы
 app.use('/api/admin', adminAudit)
