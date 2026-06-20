@@ -12,6 +12,7 @@ import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import crypto from 'node:crypto'
+import { isValidEmail } from '../../lib/validation.js'
 
 // Lazy getter — env vars доступны после dotenv.config() в server.js
 function getJwtSecret() {
@@ -186,9 +187,17 @@ export default function createAdminAuthRouter(pool) {
   // POST /api/admin/auth/login
   router.post('/login', async (req, res) => {
     try {
-      const { email, password } = req.body
+      let { email, password } = req.body
       if (!email || !password) {
         return res.status(400).json({ error: 'Email и пароль обязательны' })
+      }
+      if (password.length > 128) {
+        return res.status(400).json({ error: 'Некорректные данные' })
+      }
+
+      email = (email || '').trim().toLowerCase()
+      if (!isValidEmail(email)) {
+        return res.status(400).json({ error: 'Некорректный email' })
       }
 
       const result = await pool.query(

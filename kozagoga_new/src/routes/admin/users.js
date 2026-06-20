@@ -5,6 +5,7 @@
 
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
+import { isValidEmail } from '../../lib/validation.js'
 
 export default function createAdminUsersRouter(pool, audit) {
   const router = Router()
@@ -30,10 +31,15 @@ export default function createAdminUsersRouter(pool, audit) {
   // ─── POST /api/admin/users — создать админа ────────
   router.post('/', async (req, res) => {
     try {
-      const { email, password, role } = req.body
+      let { email, password, role } = req.body
 
       if (!email || !password) {
         return res.status(400).json({ error: 'Email и пароль обязательны' })
+      }
+
+      email = (email || '').trim().toLowerCase()
+      if (!isValidEmail(email)) {
+        return res.status(400).json({ error: 'Некорректный email' })
       }
 
       const allowedRoles = ['viewer', 'operator', 'admin']
@@ -147,7 +153,18 @@ export default function createAdminUsersRouter(pool, audit) {
   // ─── DELETE /api/admin/users/:id — удалить админа ──
   router.delete('/:id', async (req, res) => {
     try {
-      const targetId = req.params.id
+      let targetId = req.params.id
+
+      // Защита: если id === 'me' — некорректный запрос
+      if (targetId === 'me') {
+        return res.status(400).json({ error: 'Используйте PATCH /users/me для смены пароля' })
+      }
+
+      // Валидация UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      if (!uuidRegex.test(targetId)) {
+        return res.status(400).json({ error: 'Некорректный ID пользователя' })
+      }
 
       // Нельзя удалить себя
       if (targetId === req.admin.id) {

@@ -7,6 +7,7 @@ import { Router } from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { sanitizeErrorMessage } from '../../lib/validation.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -183,7 +184,7 @@ export default function createAdminConfigRouter(pool, audit) {
       res.json({ ok: true, ...result })
     } catch (err) {
       console.error('[admin-config] Reload error:', err)
-      res.status(500).json({ error: 'Ошибка перезагрузки конфигурации', details: err.message })
+      res.status(500).json({ error: 'Ошибка перезагрузки конфигурации', details: sanitizeErrorMessage(err.message) })
     }
   })
 

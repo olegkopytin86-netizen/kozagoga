@@ -228,19 +228,45 @@ export default function createAdminLogsRouter(pool) {
   // ─── GET /api/admin/logs/:id — детальная запись ────
   router.get('/:id', async (req, res) => {
     try {
+      const paramId = req.params.id
+
+      // Проверяем, UUID ли это (admin_logs) или число (system_logs)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+      if (uuidRegex.test(paramId)) {
+        // Ищем в admin_logs
+        const result = await pool.query(
+          `SELECT al.*, u.email as admin_email
+           FROM admin_logs al
+           LEFT JOIN users u ON u.id = al.admin_id
+           WHERE al.id = $1`,
+          [paramId]
+        )
+        if (result.rows.length === 0) {
+          return res.status(404).json({ error: 'Лог не найден' })
+        }
+        return res.json({ ...result.rows[0], source: 'admin_logs' })
+      }
+
+      // Ищем в system_logs
+      const sysId = parseInt(paramId)
+      if (isNaN(sysId)) {
+        return res.status(400).json({ error: 'Некорректный ID лога' })
+      }
+
       const result = await pool.query(
         `SELECT sl.*, u.email as user_email
          FROM system_logs sl
          LEFT JOIN users u ON u.id = sl.user_id
          WHERE sl.id = $1`,
-        [isNaN(req.params.id) ? -1 : parseInt(req.params.id)]
+        [sysId]
       )
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Лог не найден' })
       }
 
-      res.json(result.rows[0])
+      res.json({ ...result.rows[0], source: 'system_logs' })
     } catch (err) {
       console.error('[admin-logs] Get error:', err)
       res.status(500).json({ error: 'Ошибка получения записи лога' })

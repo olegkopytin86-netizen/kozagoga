@@ -4,20 +4,24 @@
 // ============================================
 
 import { Router } from 'express'
+import {
+  isValidSlug, isValidName, isValidDescription,
+  sanitizeTextField,
+} from '../../lib/validation.js'
 
 const MAX_DEPTH = 3
 
 export default function createAdminCategoriesRouter(pool, audit) {
   const router = Router()
 
-  // ─── Helper: проверка глубины вложенности ──────────
+  // Helper: проверка глубины вложенности
   async function getCategoryDepth(categoryId) {
     let depth = 0
     let currentId = categoryId
     const visited = new Set()
 
     while (currentId) {
-      if (visited.has(currentId)) return depth // цикл — защита
+      if (visited.has(currentId)) return depth
       visited.add(currentId)
 
       const result = await pool.query(
@@ -33,7 +37,7 @@ export default function createAdminCategoriesRouter(pool, audit) {
     return depth
   }
 
-  // ─── Helper: построение дерева ─────────────────────
+  // Helper: построение дерева
   function buildTree(categories, parentId = null) {
     return categories
       .filter(c => c.parent_id === parentId)
@@ -97,17 +101,28 @@ export default function createAdminCategoriesRouter(pool, audit) {
   // POST /api/admin/categories — создать
   router.post('/', async (req, res) => {
     try {
-      const { name, slug, description, parent_id, image_url, icon, sort_order, is_active } = req.body
+      let { name, slug, description, parent_id, image_url, icon, sort_order, is_active } = req.body
 
-      if (!name || !slug) {
-        return res.status(400).json({ error: 'Name и slug обязательны' })
+      // Санитизация
+      name = sanitizeTextField(name || '', 255)
+      slug = (slug || '').trim().toLowerCase()
+      description = sanitizeTextField(description || '', 1000)
+      image_url = (image_url || '').trim().slice(0, 500)
+      icon = (icon || '').trim().slice(0, 50)
+
+      if (!name) {
+        return res.status(400).json({ error: 'Название обязательно' })
+      }
+      if (!slug) {
+        return res.status(400).json({ error: 'Slug обязателен' })
+      }
+      if (!isValidSlug(slug)) {
+        return res.status(400).json({ error: 'Slug содержит недопустимые символы (только латиница, цифры, дефис, подчёркивание)' })
       }
 
       // Проверка глубины
       if (parent_id) {
         const parentDepth = await getCategoryDepth(parent_id)
-        // parentDepth — это сколько уровней над parent
-        // новая категория будет на parentDepth + 1
         if (parentDepth + 1 > MAX_DEPTH) {
           return res.status(400).json({
             error: `Максимальная вложенность: ${MAX_DEPTH} уровня`,
@@ -142,11 +157,25 @@ export default function createAdminCategoriesRouter(pool, audit) {
   // PUT /api/admin/categories/:id — обновить
   router.put('/:id', async (req, res) => {
     try {
-      const { name, slug, description, parent_id, image_url, icon, sort_order, is_active } = req.body
+      let { name, slug, description, parent_id, image_url, icon, sort_order, is_active } = req.body
 
       const existing = await pool.query('SELECT * FROM categories WHERE id = $1', [req.params.id])
       if (existing.rows.length === 0) {
         return res.status(404).json({ error: 'Категория не найдена' })
+      }
+
+      // Санитизация
+      const cleanName = name !== undefined ? sanitizeTextField(name, 255) : undefined
+      const cleanSlug = slug !== undefined ? (slug || '').trim().toLowerCase() : undefined
+      const cleanDesc = description !== undefined ? sanitizeTextField(description || '', 1000) : undefined
+      const cleanImage = image_url !== undefined ? (image_url || '').trim().slice(0, 500) : undefined
+      const cleanIcon = icon !== undefined ? (icon || '').trim().slice(0, 50) : undefined
+
+      if (cleanName !== undefined && !cleanName) {
+        return res.status(400).json({ error: 'Название не может быть пустым' })
+      }
+      if (cleanSlug !== undefined && !isValidSlug(cleanSlug)) {
+        return res.status(400).json({ error: 'Slug содержит недопустимые символы' })
       }
 
       // Проверка глубины при смене parent
@@ -166,8 +195,8 @@ export default function createAdminCategoriesRouter(pool, audit) {
       }
 
       // Проверка slug при смене
-      if (slug && slug !== existing.rows[0].slug) {
-        const slugCheck = await pool.query('SELECT id FROM categories WHERE slug = $1 AND id != $2', [slug, req.params.id])
+      if (cleanSlug && cleanSlug !== existing.rows[0].slug) {
+        const slugCheck = await pool.query('SELECT id FROM categories WHERE slug = $1 AND id != $2', [cleanSlug, req.params.id])
         if (slugCheck.rows.length > 0) {
           return res.status(409).json({ error: 'Категория с таким slug уже существует' })
         }
@@ -187,12 +216,12 @@ export default function createAdminCategoriesRouter(pool, audit) {
          WHERE id = $9
          RETURNING *`,
         [
-          name || null,
-          slug || null,
-          description !== undefined ? description : null,
+          cleanName || null,
+          cleanSlug || null,
+          cleanDesc !== undefined ? cleanDesc : null,
           parent_id !== undefined ? parent_id : existing.rows[0].parent_id,
-          image_url !== undefined ? image_url : null,
-          icon !== undefined ? icon : null,
+          cleanImage !== undefined ? cleanImage : null,
+          cleanIcon !== undefined ? cleanIcon : null,
           sort_order !== undefined ? sort_order : null,
           is_active !== undefined ? is_active : null,
           req.params.id,
@@ -201,7 +230,7 @@ export default function createAdminCategoriesRouter(pool, audit) {
 
       await audit.log(req, 'category.update', {
         entity_id: req.params.id,
-        changes: { name, slug, parent_id, is_active },
+        changes: { name: cleanName, slug: cleanSlug, parent_id, is_active },
       })
 
       res.json(result.rows[0])
@@ -254,7 +283,7 @@ export default function createAdminCategoriesRouter(pool, audit) {
   // PUT /api/admin/categories/order — массовое изменение порядка
   router.put('/order', async (req, res) => {
     try {
-      const { items } = req.body // [{ id, sort_order }]
+      const { items } = req.body
 
       if (!Array.isArray(items)) {
         return res.status(400).json({ error: 'items — обязательный массив { id, sort_order }' })

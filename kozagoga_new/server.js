@@ -10,6 +10,22 @@ import dotenv from 'dotenv'
 import cookieParser from 'cookie-parser'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
+import crypto from 'node:crypto'
+
+import {
+  sanitizeHtml,
+  stripDangerousTags,
+  isValidSlug,
+  isValidEmail,
+  isValidPrice,
+  isValidName,
+  isValidDescription,
+  sanitizePrice,
+  sanitizeTextField,
+  sanitizeErrorMessage,
+  truncateStr,
+} from './src/lib/validation.js'
+import { createSystemLogger } from './src/lib/system-logger.js'
 
 dotenv.config()
 
@@ -193,9 +209,13 @@ function requireAuth(req, res, next) {
 // ─── Auth endpoints ───────────────────────────────────────
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password } = req.body
+    let { email, password } = req.body
     if (!email || !password) return res.status(400).json({ error: 'Email и пароль обязательны' })
     if (password.length < 6) return res.status(400).json({ error: 'Пароль должен быть не менее 6 символов' })
+    if (password.length > 128) return res.status(400).json({ error: 'Пароль слишком длинный' })
+
+    email = (email || '').trim().toLowerCase()
+    if (!isValidEmail(email)) return res.status(400).json({ error: 'Некорректный email' })
 
     const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email])
     if (existing.rows.length > 0) return res.status(409).json({ error: 'Пользователь с таким email уже существует' })
@@ -221,8 +241,10 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { email, password } = req.body
+    let { email, password } = req.body
     if (!email || !password) return res.status(400).json({ error: 'Email и пароль обязательны' })
+    if (password.length > 128) return res.status(400).json({ error: 'Некорректные данные' })
+    email = (email || '').trim().toLowerCase()
 
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email])
     if (result.rows.length === 0) return res.status(401).json({ error: 'Неверный email или пароль' })
@@ -379,7 +401,7 @@ app.post('/api/validate', rateLimit(getRateLimits().validate || 60), async (req,
     res.json(result)
   } catch (err) {
     console.error('POST /api/validate error:', err)
-    res.status(502).json({ error: 'Ошибка валидации', details: err.message })
+    res.status(502).json({ error: 'Ошибка валидации', details: sanitizeErrorMessage(err.message) })
   }
 })
 
@@ -463,7 +485,7 @@ app.post('/api/pay', requireAuth, async (req, res) => {
     res.json({ results })
   } catch (err) {
     console.error('POST /api/pay error:', err)
-    res.status(500).json({ error: 'Ошибка отправки платежа провайдеру', details: err.message })
+    res.status(500).json({ error: 'Ошибка отправки платежа провайдеру', details: sanitizeErrorMessage(err.message) })
   }
 })
 
@@ -495,7 +517,7 @@ app.post('/api/status', requireAuth, async (req, res) => {
     })
   } catch (err) {
     console.error('POST /api/status error:', err)
-    res.status(502).json({ error: 'Ошибка получения статуса', details: err.message })
+    res.status(502).json({ error: 'Ошибка получения статуса', details: sanitizeErrorMessage(err.message) })
   }
 })
 
@@ -521,7 +543,7 @@ app.post('/api/precheck', async (req, res) => {
     res.json(result)
   } catch (err) {
     console.error('POST /api/precheck error:', err)
-    res.status(502).json({ error: 'Ошибка предрасчёта', details: err.message })
+    res.status(502).json({ error: 'Ошибка предрасчёта', details: sanitizeErrorMessage(err.message) })
   }
 })
 
@@ -561,7 +583,7 @@ app.post('/api/cancel', requireRole('admin'), async (req, res) => {
     res.json({ result: true })
   } catch (err) {
     console.error('POST /api/cancel error:', err)
-    res.status(500).json({ error: 'Ошибка отмены', details: err.message })
+    res.status(500).json({ error: 'Ошибка отмены', details: sanitizeErrorMessage(err.message) })
   }
 })
 
@@ -634,7 +656,7 @@ app.post('/api/orders', requireAuth, rateLimit(getRateLimits().orders || 30), as
     }
   } catch (err) {
     console.error('POST /api/orders error:', err)
-    res.status(500).json({ error: 'Ошибка создания заказа', details: err.message })
+    res.status(500).json({ error: 'Ошибка создания заказа', details: sanitizeErrorMessage(err.message) })
   }
 })
 
@@ -691,7 +713,7 @@ app.post('/api/payments/process', requireAuth, rateLimit(getRateLimits().payment
     res.json(result)
   } catch (err) {
     console.error('POST /api/payments/process error:', err)
-    res.status(502).json({ error: 'Ошибка обработки платежа', details: err.message })
+    res.status(502).json({ error: 'Ошибка обработки платежа', details: sanitizeErrorMessage(err.message) })
   }
 })
 
@@ -883,7 +905,7 @@ app.post('/api/payments/refund', requireRole('admin'), async (req, res) => {
     res.json({ result: true })
   } catch (err) {
     console.error('POST /api/payments/refund error:', err)
-    res.status(500).json({ error: 'Ошибка возврата', details: err.message })
+    res.status(500).json({ error: 'Ошибка возврата', details: sanitizeErrorMessage(err.message) })
   }
 })
 
@@ -917,7 +939,7 @@ app.post('/api/payments/reverse', requireRole('admin'), async (req, res) => {
     res.json({ result: true })
   } catch (err) {
     console.error('POST /api/payments/reverse error:', err)
-    res.status(500).json({ error: 'Ошибка отмены платежа', details: err.message })
+    res.status(500).json({ error: 'Ошибка отмены платежа', details: sanitizeErrorMessage(err.message) })
   }
 })
 
@@ -1463,35 +1485,34 @@ app.put('/api/auth/profile', requireAuth, async (req, res) => {
     let idx = 1
 
     if (name !== undefined) {
-      // Валидация: непустое имя
-      if (typeof name !== 'string' || name.trim().length === 0) {
-        return res.status(400).json({ error: 'Имя не может быть пустым' })
+      if (!isValidName(name)) {
+        return res.status(400).json({ error: 'Некорректное имя (макс. 255 символов)' })
       }
       updates.push(`name = $${idx++}`)
-      params.push(name.trim())
+      params.push(sanitizeTextField(name.trim(), 255))
     }
 
     if (email !== undefined) {
-      // Валидация email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(email)) {
+      let cleanEmail = (email || '').trim().toLowerCase()
+      if (!isValidEmail(cleanEmail)) {
         return res.status(400).json({ error: 'Некорректный email' })
       }
       // Проверка уникальности
       const existing = await pool.query(
         'SELECT id FROM users WHERE email = $1 AND id != $2',
-        [email, req.user.id]
+        [cleanEmail, req.user.id]
       )
       if (existing.rows.length > 0) {
         return res.status(409).json({ error: 'Этот email уже используется' })
       }
       updates.push(`email = $${idx++}`)
-      params.push(email)
+      params.push(cleanEmail)
     }
 
     if (phone !== undefined) {
+      const cleanPhone = String(phone || '').replace(/[^\d+\-()\s]/g, '').slice(0, 20)
       updates.push(`phone = $${idx++}`)
-      params.push(phone)
+      params.push(cleanPhone || null)
     }
 
     if (updates.length === 0) {
@@ -1644,6 +1665,10 @@ app.use('/api/admin/config',
   requireAdminRole('admin', 'superadmin'),
   adminConfigRouter
 )
+
+// System logger middleware
+const sysLogger = createSystemLogger(pool)
+app.use(sysLogger.middleware)
 
 // Audit middleware — логирует все state-changing admin-запросы
 app.use('/api/admin', adminAudit)
