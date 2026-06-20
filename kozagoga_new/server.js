@@ -48,6 +48,21 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'kozagogo',
   user: process.env.DB_USER || 'kozagogo',
   password: process.env.DB_PASS || 'kozagogo_pass_2024',
+  max: parseInt(process.env.DB_POOL_MAX || '30'),
+  idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
+  connectionTimeoutMillis: parseInt(process.env.DB_CONN_TIMEOUT || '5000'),
+})
+
+// Read pool — для публичных эндпоинтов (каталог, категории)
+const readPool = new Pool({
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432'),
+  database: process.env.DB_NAME || 'kozagogo',
+  user: process.env.DB_USER || 'kozagogo',
+  password: process.env.DB_PASS || 'kozagogo_pass_2024',
+  max: parseInt(process.env.DB_POOL_MAX_READ || '20'),
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
 })
 
 // ─── Инициализация модулей интеграций ──────────────────
@@ -1413,6 +1428,137 @@ app.delete('/api/rest/v1/:table/:id', async (req, res) => {
   } catch (err) {
     console.error(`Error deleting from ${table}:`, err)
     res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// ═══════════════════════════════════════════════════════════
+// PUBLIC API — витрина без аутентификации
+// ═══════════════════════════════════════════════════════════
+
+// Кэш категорий (in-memory, 5 мин)
+const categoryPublicCache = { data: null, time: 0 }
+const CATEGORY_CACHE_TTL = 300_000
+
+app.get(['/api/categories', '/api/public/categories'], async (req, res) => {
+  try {
+    if (categoryPublicCache.data && Date.now() - categoryPublicCache.time < CATEGORY_CACHE_TTL) {
+      return res.json(categoryPublicCache.data)
+    }
+    const { rows } = await readPool.query(
+      `SELECT id, name, slug, description, icon, image_url, sort_order,
+              (SELECT COUNT(*) FROM products WHERE category_id = categories.id AND is_active = true) as product_count
+       FROM categories WHERE is_active = true ORDER BY sort_order ASC, name ASC`
+    )
+    categoryPublicCache.data = rows
+    categoryPublicCache.time = Date.now()
+    res.json(rows)
+  } catch (err) {
+    console.error('GET /api/categories error:', err)
+    res.status(500).json({ error: 'Ошибка получения категорий' })
+  }
+})
+
+// Кэш товаров (in-memory, 2 мин)
+const productPublicCache = { data: null, time: 0 }
+const PRODUCT_CACHE_TTL = 120_000
+
+app.get(['/api/products', '/api/public/products'], async (req, res) => {
+  try {
+    const { category, featured, search, page = '1', limit = '50', sort } = req.query
+
+    const pageNum = Math.max(1, parseInt(page))
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit)))
+    const offset = (pageNum - 1) * limitNum
+
+    // Проверяем кэш только для первого экрана без фильтров
+    const isDefaultQuery = !category && !featured && !search && !sort && page === '1' && limit === '50'
+    if (isDefaultQuery && productPublicCache.data && Date.now() - productPublicCache.time < PRODUCT_CACHE_TTL) {
+      return res.json(productPublicCache.data)
+    }
+
+    // Используем readPool для публичных запросов
+    const params = []
+    const conditions = ['p.is_active = true']
+    let idx = 1
+
+    if (category) {
+      conditions.push(`(c.slug = $${idx} OR c.id::text = $${idx})`)
+      params.push(category)
+      idx++
+    }
+    if (featured === 'true') {
+      conditions.push('p.is_featured = true')
+    }
+    if (search) {
+      conditions.push(`(p.name ILIKE $${idx} OR p.short_description ILIKE $${idx} OR p.tags::text ILIKE $${idx})`)
+      params.push(`%${search}%`)
+      idx++
+    }
+
+    const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : ''
+
+    const countResult = await readPool.query(
+      `SELECT COUNT(*) FROM products p LEFT JOIN categories c ON c.id = p.category_id${where}`,
+      params
+    )
+    const total = parseInt(countResult.rows[0].count)
+
+    // Без JSONB-полей (features, faq, tags, provider_params) — только для списка
+    const orderSQL = sort === 'price_asc' ? 'ORDER BY p.price ASC'
+      : sort === 'price_desc' ? 'ORDER BY p.price DESC'
+      : sort === 'rating' ? 'ORDER BY p.rating DESC'
+      : sort === 'newest' ? 'ORDER BY p.created_at DESC'
+      : 'ORDER BY p.sort_order ASC, p.created_at DESC'
+
+    const result = await readPool.query(
+      `SELECT p.id, p.name, p.slug, p.short_description, p.price, p.old_price,
+              p.image_url, p.delivery_time, p.region, p.rating, p.review_count,
+              p.is_featured, p.seller_name, p.seller_verified,
+              c.name as category_name, c.slug as category_slug
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       ${where}
+       ${orderSQL}
+       LIMIT $${idx++} OFFSET $${idx++}`,
+      [...params, limitNum, offset]
+    )
+
+    const data = {
+      items: result.rows,
+      pagination: { page: pageNum, limit: limitNum, total, total_pages: Math.ceil(total / limitNum) },
+    }
+
+    if (isDefaultQuery) {
+      productPublicCache.data = data
+      productPublicCache.time = Date.now()
+    }
+
+    res.json(data)
+  } catch (err) {
+    console.error('GET /api/products error:', err)
+    res.status(500).json({ error: 'Ошибка получения товаров' })
+  }
+})
+
+// GET /api/products/:slug — детали товара (с JSONB-полями)
+app.get(['/api/products/:slug', '/api/public/products/:slug'], async (req, res) => {
+  try {
+    const { slug } = req.params
+    const result = await readPool.query(
+      `SELECT p.*, c.name as category_name, c.slug as category_slug
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE (p.slug = $1 OR p.id::text = $1) AND p.is_active = true
+       LIMIT 1`,
+      [slug]
+    )
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Товар не найден' })
+    }
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error('GET /api/products/:slug error:', err)
+    res.status(500).json({ error: 'Ошибка получения товара' })
   }
 })
 
