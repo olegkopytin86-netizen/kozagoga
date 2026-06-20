@@ -175,6 +175,21 @@ export const adminTransactions = {
   stats: (params?: Record<string, string>) => adminApi.get('/transactions/stats', params),
 }
 
+export const adminConfig = {
+  get: () => adminApi.get('/config'),
+  getRaw: () => adminApi.get('/config/raw'),
+  saveRaw: (content: string) => adminApi.put('/config/raw', { content }),
+  reload: () => adminApi.post('/config/reload'),
+  getSection: (section: string) => adminApi.get(`/config/${section}`),
+}
+
+export const adminLogs = {
+  list: (params?: Record<string, string>) => adminApi.get('/logs', params),
+  adminList: (params?: Record<string, string>) => adminApi.get('/logs/admin', params),
+  get: (id: number) => adminApi.get(`/logs/${id}`),
+  stats: (params?: Record<string, string>) => adminApi.get('/logs/stats', params),
+}
+
 export const adminUsers = {
   list: () => adminApi.get('/users'),
   create: (data: { email: string; password: string; role?: string }) => adminApi.post('/users', data),

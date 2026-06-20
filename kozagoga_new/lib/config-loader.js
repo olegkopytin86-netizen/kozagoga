@@ -83,5 +83,12 @@ export function enableHotReload() {
   console.log('[config] Hot-reload включён')
 }
 
+/** Принудительная перезагрузка конфигурации */
+export function reloadConfig() {
+  const oldVersion = configVersion
+  loadConfig()
+  return { version: configVersion, reloaded: configVersion !== oldVersion, sections: config ? Object.keys(config) : [] }
+}
+
 // Загружаем при импорте
 loadConfig()

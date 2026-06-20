@@ -100,6 +100,30 @@ export async function validateRequisite(product_id: string, requisite: string, p
   return handleResponse<{ result: string; details: string; possible: boolean }>(res)
 }
 
+// ─── Profile ──────────────────────────────────────────
+export async function getProfile() {
+  const res = await fetch(`${API_BASE}/api/auth/profile`, { headers: headers() })
+  return handleResponse<{ id: string; email: string; name: string | null; phone: string | null; role: string; created_at: string; updated_at: string }>(res)
+}
+
+export async function updateProfile(data: { name?: string; email?: string; phone?: string }) {
+  const res = await fetch(`${API_BASE}/api/auth/profile`, {
+    method: 'PUT',
+    headers: headers(),
+    body: JSON.stringify(data),
+  })
+  return handleResponse<{ id: string; email: string; name: string | null; phone: string | null }>(res)
+}
+
+export async function changePassword(current_password: string, new_password: string) {
+  const res = await fetch(`${API_BASE}/api/auth/password`, {
+    method: 'PUT',
+    headers: headers(),
+    body: JSON.stringify({ current_password, new_password }),
+  })
+  return handleResponse<{ ok: boolean }>(res)
+}
+
 // ─── Types ─────────────────────────────────────────────
 export interface WalletTransaction {
   id: string

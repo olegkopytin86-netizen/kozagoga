@@ -1432,6 +1432,115 @@ app.get('/api/health', async (req, res) => {
   }
 })
 
+// ═══════════════════════════════════════════════════════════
+// PROFILE: ЛИЧНЫЙ КАБИНЕТ ПОЛЬЗОВАТЕЛЯ
+// ═══════════════════════════════════════════════════════════
+
+// FR-50: GET /api/auth/profile — полный профиль пользователя
+app.get('/api/auth/profile', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, email, name, phone, avatar_url, role, created_at, updated_at FROM users WHERE id = $1',
+      [req.user.id]
+    )
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Пользователь не найден' })
+    }
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error('GET /api/auth/profile error:', err)
+    res.status(500).json({ error: 'Ошибка получения профиля' })
+  }
+})
+
+// FR-51: PUT /api/auth/profile — обновление профиля (name, email, phone)
+app.put('/api/auth/profile', requireAuth, async (req, res) => {
+  try {
+    const { name, email, phone } = req.body
+
+    const updates = []
+    const params = []
+    let idx = 1
+
+    if (name !== undefined) {
+      // Валидация: непустое имя
+      if (typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ error: 'Имя не может быть пустым' })
+      }
+      updates.push(`name = $${idx++}`)
+      params.push(name.trim())
+    }
+
+    if (email !== undefined) {
+      // Валидация email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: 'Некорректный email' })
+      }
+      // Проверка уникальности
+      const existing = await pool.query(
+        'SELECT id FROM users WHERE email = $1 AND id != $2',
+        [email, req.user.id]
+      )
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ error: 'Этот email уже используется' })
+      }
+      updates.push(`email = $${idx++}`)
+      params.push(email)
+    }
+
+    if (phone !== undefined) {
+      updates.push(`phone = $${idx++}`)
+      params.push(phone)
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'Нет полей для обновления' })
+    }
+
+    params.push(req.user.id)
+    const result = await pool.query(
+      `UPDATE users SET ${updates.join(', ')} WHERE id = $${idx} RETURNING id, email, name, phone, role, created_at, updated_at`,
+      params
+    )
+
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error('PUT /api/auth/profile error:', err)
+    res.status(500).json({ error: 'Ошибка обновления профиля' })
+  }
+})
+
+// FR-52: PUT /api/auth/password — смена пароля
+app.put('/api/auth/password', requireAuth, async (req, res) => {
+  try {
+    const { current_password, new_password } = req.body
+
+    if (!current_password || !new_password) {
+      return res.status(400).json({ error: 'current_password и new_password обязательны' })
+    }
+
+    if (new_password.length < 6) {
+      return res.status(400).json({ error: 'Новый пароль должен быть не менее 6 символов' })
+    }
+
+    // Проверяем текущий пароль
+    const userRes = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id])
+    const valid = await bcrypt.compare(current_password, userRes.rows[0].password_hash)
+    if (!valid) {
+      return res.status(401).json({ error: 'Неверный текущий пароль' })
+    }
+
+    const passwordHash = await bcrypt.hash(new_password, 10)
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, req.user.id])
+
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('PUT /api/auth/password error:', err)
+    res.status(500).json({ error: 'Ошибка смены пароля' })
+  }
+})
+
 // ─── Seed endpoint (только для админа) ───────────────────
 app.post('/api/seed', requireAuth, async (req, res) => {
   try {
@@ -1518,6 +1627,26 @@ app.use('/api/admin/users',
   csrfProtectionMiddleware,
   requireAdminRole('superadmin'),
   adminUsersRouter
+)
+
+// Admin logs
+import createAdminLogsRouter from './src/routes/admin/logs.js'
+const adminLogsRouter = createAdminLogsRouter(pool)
+
+app.use('/api/admin/logs',
+  csrfProtectionMiddleware,
+  requireAdminRole('operator', 'admin', 'superadmin'),
+  adminLogsRouter
+)
+
+// Admin config
+import createAdminConfigRouter from './src/routes/admin/config.js'
+const adminConfigRouter = createAdminConfigRouter(pool, adminAudit)
+
+app.use('/api/admin/config',
+  csrfProtectionMiddleware,
+  requireAdminRole('admin', 'superadmin'),
+  adminConfigRouter
 )
 
 // Audit middleware — логирует все state-changing admin-запросы

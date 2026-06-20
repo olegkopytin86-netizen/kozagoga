@@ -38,7 +38,7 @@ export default function Dashboard() {
       title: "Настройки профиля",
       description: "Изменить email, пароль и личные данные",
       icon: Settings,
-      href: "/dashboard/settings",
+      href: "/profile",
       color: "text-muted-foreground",
     },
   ]
