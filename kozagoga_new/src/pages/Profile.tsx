@@ -1,12 +1,14 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { User, Mail, Lock, Save, ArrowLeft, Eye, EyeOff } from "lucide-react"
+import { User, Mail, Lock, Save, ArrowLeft, Eye, EyeOff, Award, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/contexts/AuthContext"
+import LoyaltyCard from "@/components/LoyaltyCard"
+import ReferralWidget from "@/components/ReferralWidget"
 
 export default function Profile() {
   const { user } = useAuth()
@@ -42,6 +44,26 @@ export default function Profile() {
             Управляйте своими личными данными
           </p>
         </div>
+
+        {/* Лояльность */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+            <Award className="h-5 w-5 text-amber-500" />
+            Программа лояльности
+          </h2>
+          <LoyaltyCard />
+        </div>
+
+        {/* Рефералки */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" />
+            Реферальная программа
+          </h2>
+          <ReferralWidget />
+        </div>
+
+        <Separator className="mb-6" />
 
         <form onSubmit={handleSave}>
           <Card className="mb-6">
