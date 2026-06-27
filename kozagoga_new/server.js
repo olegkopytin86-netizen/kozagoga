@@ -16,6 +16,10 @@ import createWishlistRouter from './src/routes/wishlist.js'
 import createReferralRouter from './src/routes/referral.js'
 import createCouponAdminRouter from './src/routes/admin-coupons.js'
 import createBundlesRouter from './src/routes/bundles.js'
+import createSubscriptionRouter from './src/routes/subscriptions.js'
+import createLoyaltyRouter from './src/routes/loyalty.js'
+import createGiftsRouter from './src/routes/gifts.js'
+import { initScheduler } from './src/services/scheduler.js'
 import createProductsRouter from './src/routes/products.js'
 import createCategoriesRouter from './src/routes/categories.js'
 
@@ -60,6 +64,9 @@ app.use('/api/wishlist', createWishlistRouter())
 app.use('/api', createReferralRouter())
 app.use('/api/admin/promotions', createCouponAdminRouter())
 app.use('/api/bundles', createBundlesRouter())
+app.use('/api/subscriptions', createSubscriptionRouter())
+app.use('/api/gifts', createGiftsRouter())
+app.use('/api', createLoyaltyRouter())
 app.use('/api/products', createProductsRouter())
 app.use('/api/categories', createCategoriesRouter())
 
@@ -1545,6 +1552,7 @@ async function start() {
     // Инициализируем провайдеров
     await initProviders()
     console.log('[server] Провайдеры инициализированы')
+    initScheduler()
 
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 API Server running on http://0.0.0.0:${PORT}`)
