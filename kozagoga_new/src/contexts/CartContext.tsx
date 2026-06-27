@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+// Cart Context — серверная корзина через /api/cart/*
+// (SRS Модуль 3)
+// ─────────────────────────────────────────────────────────
+
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react"
+import { fetchCart, addToCartAPI, updateCartItemAPI, removeFromCartAPI, clearCartAPI } from "@/lib/cart-api"
+import type { ServerCartItem, ServerCartResponse } from "@/lib/cart-api"
 
 export interface CartItem {
   id: string
@@ -12,66 +18,79 @@ export interface CartItem {
 
 interface CartContextType {
   items: CartItem[]
-  addItem: (item: Omit<CartItem, "quantity">) => void
-  removeItem: (id: string) => void
-  updateQuantity: (id: string, quantity: number) => void
-  clearCart: () => void
+  addItem: (item: Omit<CartItem, "quantity">) => Promise<void>
+  removeItem: (id: string) => Promise<void>
+  updateQuantity: (id: string, quantity: number) => Promise<void>
+  clearCart: () => Promise<void>
   itemCount: number
   subtotal: number
+  loading: boolean
+  serverCart: ServerCartResponse | null
+  refreshCart: () => Promise<void>
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
-const CART_STORAGE_KEY = "kozagogo_cart"
+function mapServerItems(items: ServerCartItem[]): CartItem[] {
+  return items.map(item => ({
+    id: item.id,
+    productId: item.product_id,
+    name: item.product_name,
+    price: parseFloat(item.item_price),
+    quantity: item.quantity,
+    image: item.image_url || '',
+    slug: item.slug,
+  }))
+}
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>(() => {
+  const [serverCart, setServerCart] = useState<ServerCartResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const refreshCart = useCallback(async () => {
     try {
-      const stored = localStorage.getItem(CART_STORAGE_KEY)
-      return stored ? JSON.parse(stored) : []
+      const cart = await fetchCart()
+      setServerCart(cart)
     } catch {
-      return []
+      // Если сервер недоступен — показываем пустую корзину
+      setServerCart(null)
+    } finally {
+      setLoading(false)
     }
-  })
+  }, [])
 
+  // Загружаем корзину при монтировании
   useEffect(() => {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items))
-  }, [items])
+    refreshCart()
+  }, [refreshCart])
 
-  const addItem = (newItem: Omit<CartItem, "quantity">) => {
-    setItems((prev) => {
-      const existing = prev.find((item) => item.productId === newItem.productId)
-      if (existing) {
-        return prev.map((item) =>
-          item.productId === newItem.productId
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      }
-      return [...prev, { ...newItem, quantity: 1 }]
-    })
-  }
+  const items = serverCart ? mapServerItems(serverCart.items) : []
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
+  const subtotal = serverCart?.subtotal || 0
 
-  const removeItem = (id: string) => {
-    setItems((prev) => prev.filter((item) => item.id !== id))
-  }
+  const addItem = useCallback(async (newItem: Omit<CartItem, "quantity">) => {
+    await addToCartAPI(newItem.productId, 1)
+    await refreshCart()
+  }, [refreshCart])
 
-  const updateQuantity = (id: string, quantity: number) => {
+  const removeItem = useCallback(async (id: string) => {
+    await removeFromCartAPI(id)
+    await refreshCart()
+  }, [refreshCart])
+
+  const updateQuantity = useCallback(async (id: string, quantity: number) => {
     if (quantity <= 0) {
-      removeItem(id)
+      await removeItem(id)
       return
     }
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, quantity } : item))
-    )
-  }
+    await updateCartItemAPI(id, quantity)
+    await refreshCart()
+  }, [removeItem, refreshCart])
 
-  const clearCart = () => {
-    setItems([])
-  }
-
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const clearCart = useCallback(async () => {
+    await clearCartAPI()
+    await refreshCart()
+  }, [refreshCart])
 
   return (
     <CartContext.Provider
@@ -83,6 +102,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         clearCart,
         itemCount,
         subtotal,
+        loading,
+        serverCart,
+        refreshCart,
       }}
     >
       {children}

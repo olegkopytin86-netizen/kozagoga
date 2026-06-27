@@ -3,7 +3,7 @@
 
 // API_BASE — используем относительный путь (nginx проксирует /api/ на backend)
 // Для переопределения: window.__KOZAGOGA_API_URL__ = 'https://api.example.com'
-const API_BASE = typeof window !== 'undefined'
+export const API_BASE = typeof window !== 'undefined'
   ? (window.__KOZAGOGA_API_URL__ || '')
   : ''
 
@@ -15,7 +15,7 @@ function getToken(): string | null {
   }
 }
 
-function headers(extra: Record<string, string> = {}): Record<string, string> {
+export function headers(extra: Record<string, string> = {}): Record<string, string> {
   const h: Record<string, string> = {
     'Content-Type': 'application/json',
     ...extra,
@@ -25,7 +25,7 @@ function headers(extra: Record<string, string> = {}): Record<string, string> {
   return h
 }
 
-async function handleResponse<T>(res: Response): Promise<T> {
+export async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(body.error || `HTTP ${res.status}`)
