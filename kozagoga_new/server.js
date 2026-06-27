@@ -9,6 +9,7 @@ import pkg from 'pg'
 import dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
+import { getPool } from './src/lib/pool.js'
 
 dotenv.config()
 
@@ -25,13 +26,7 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
   process.exit(1)
 }
 
-const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'kozagogo',
-  user: process.env.DB_USER || 'kozagogo',
-  password: process.env.DB_PASS || 'kozagogo_pass_2024',
-})
+const pool = getPool()
 
 // ─── Инициализация модулей интеграций ──────────────────
 import { getConfig, getPollingConfig, getPaymentGatewayMapping, getRateLimits, getPaymentConfig } from './lib/config-loader.js'
@@ -1518,6 +1513,10 @@ app.post('/api/seed', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Seed failed' })
   }
 })
+
+// ─── Новые API роуты (SRS Modules) ─────────────────────
+import createCartRouter from './src/routes/cart.js'
+app.use('/api/cart', createCartRouter())
 
 // ─── Запуск ───────────────────────────────────────────────
 async function start() {
