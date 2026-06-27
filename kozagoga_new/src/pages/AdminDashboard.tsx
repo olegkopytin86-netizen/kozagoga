@@ -20,6 +20,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatPrice } from "@/lib/utils"
 import type { Product, Order, Category } from "@/types/database"
+import AdminKeyPool from './admin/AdminKeyPool'
+import AdminCoupons from './admin/AdminCoupons'
+import AdminBundles from './admin/AdminBundles'
 
 export default function AdminDashboard() {
   const [products, setProducts] = useState<Product[]>([])
@@ -150,6 +153,15 @@ export default function AdminDashboard() {
             </TabsTrigger>
             <TabsTrigger value="categories">
               <FolderTree className="mr-2 h-4 w-4" />
+            <TabsTrigger value="keypool">
+              🔑 Ключи
+            </TabsTrigger>
+            <TabsTrigger value="coupons">
+              🏷️ Промокоды
+            </TabsTrigger>
+            <TabsTrigger value="bundles">
+              📦 Комплекты
+            </TabsTrigger>
               Категории
             </TabsTrigger>
           </TabsList>
@@ -315,6 +327,15 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+          <TabsContent value="keypool">
+            <AdminKeyPool />
+          </TabsContent>
+          <TabsContent value="coupons">
+            <AdminCoupons />
+          </TabsContent>
+          <TabsContent value="bundles">
+            <AdminBundles />
           </TabsContent>
         </Tabs>
       </div>
