@@ -15,6 +15,7 @@ import createDeliveryRouter from './src/routes/delivery.js'
 import createWishlistRouter from './src/routes/wishlist.js'
 import createReferralRouter from './src/routes/referral.js'
 import createCouponAdminRouter from './src/routes/admin-coupons.js'
+import createBundlesRouter from './src/routes/bundles.js'
 import createProductsRouter from './src/routes/products.js'
 import createCategoriesRouter from './src/routes/categories.js'
 
@@ -58,6 +59,7 @@ app.use('/api/deliveries', createDeliveryRouter())
 app.use('/api/wishlist', createWishlistRouter())
 app.use('/api', createReferralRouter())
 app.use('/api/admin/promotions', createCouponAdminRouter())
+app.use('/api/bundles', createBundlesRouter())
 app.use('/api/products', createProductsRouter())
 app.use('/api/categories', createCategoriesRouter())
 
