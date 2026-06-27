@@ -13,6 +13,7 @@ import { getPool } from './src/lib/pool.js'
 import createCartRouter from './src/routes/cart.js'
 import createDeliveryRouter from './src/routes/delivery.js'
 import createWishlistRouter from './src/routes/wishlist.js'
+import createReferralRouter from './src/routes/referral.js'
 import createProductsRouter from './src/routes/products.js'
 import createCategoriesRouter from './src/routes/categories.js'
 
@@ -54,6 +55,7 @@ const app = express()
 app.use('/api/cart', createCartRouter())
 app.use('/api/deliveries', createDeliveryRouter())
 app.use('/api/wishlist', createWishlistRouter())
+app.use('/api', createReferralRouter())
 app.use('/api/products', createProductsRouter())
 app.use('/api/categories', createCategoriesRouter())
 
