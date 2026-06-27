@@ -83,7 +83,13 @@ export default function ProductCard({ product, className }: ProductCardProps) {
         {/* Цена и кнопка */}
         <div className="flex items-center justify-between">
           <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold">{formatPrice(product.price)}</span>
+            {product.price_min && product.price_max && product.price_min !== product.price_max ? (
+              <span className="text-lg font-bold">
+                {formatPrice(product.price_min)} — {formatPrice(product.price_max)}
+              </span>
+            ) : (
+              <span className="text-lg font-bold">{formatPrice(product.price)}</span>
+            )}
             {product.old_price && product.old_price > product.price && (
               <span className="text-xs text-muted-foreground line-through">
                 {formatPrice(product.old_price)}

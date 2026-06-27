@@ -14,11 +14,12 @@ export interface CartItem {
   quantity: number
   image: string
   slug: string
+  variantId?: string | null
 }
 
 interface CartContextType {
   items: CartItem[]
-  addItem: (item: Omit<CartItem, "quantity">) => Promise<void>
+  addItem: (item: Omit<CartItem, "quantity"> & { variantId?: string | null }) => Promise<void>
   removeItem: (id: string) => Promise<void>
   updateQuantity: (id: string, quantity: number) => Promise<void>
   clearCart: () => Promise<void>
@@ -68,8 +69,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
   const subtotal = serverCart?.subtotal || 0
 
-  const addItem = useCallback(async (newItem: Omit<CartItem, "quantity">) => {
-    await addToCartAPI(newItem.productId, 1)
+  const addItem = useCallback(async (newItem: Omit<CartItem, "quantity"> & { variantId?: string | null }) => {
+    await addToCartAPI(newItem.productId, 1, newItem.variantId || undefined)
     await refreshCart()
   }, [refreshCart])
 

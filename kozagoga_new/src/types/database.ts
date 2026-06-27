@@ -26,6 +26,8 @@ export interface Product {
   image: string | null
   price: number
   old_price: number | null
+  price_min?: number | null
+  price_max?: number | null
   category_id: string | null
   category_slug?: string | null
   delivery_time: string | null

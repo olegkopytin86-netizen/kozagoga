@@ -1,60 +1,82 @@
 import { useEffect, useState } from "react"
 import { useParams, Link, useNavigate } from "react-router-dom"
 import { Star, Clock, MapPin, Shield, CheckCircle, ChevronLeft, Zap, Package, ShoppingCart, Info, MessageCircle, HelpCircle, ChevronDown, Minus, Plus } from "lucide-react"
-import { db } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import TrustBlock from "@/components/TrustBlock"
+import VariantSelector, { type Variant } from "@/components/VariantSelector"
 import { useCart } from "@/contexts/CartContext"
 import { cn, formatPrice } from "@/lib/utils"
 import ServiceForm from "@/components/ServiceForm"
-import type { Product, ProductImage } from "@/types/database"
 
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>()
   const { addItem } = useCart()
   const navigate = useNavigate()
-  const [product, setProduct] = useState<Product | null>(null)
-  const [images, setImages] = useState<ProductImage[]>([])
+  const [product, setProduct] = useState<any>(null)
+  const [variants, setVariants] = useState<Variant[]>([])
+  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeImage, setActiveImage] = useState(0)
   const [quantity, setQuantity] = useState(1)
   const [addedToCart, setAddedToCart] = useState(false)
 
+  // Helper: получить массив URL изображений
+  const productImages: string[] = product?.images
+    ? (Array.isArray(product.images) ? product.images : [])
+    : product?.image ? [product.image] : []
+
+  // Загружаем товар и варианты через API
   useEffect(() => {
     const fetchProduct = async () => {
       if (!slug) return
-      const { data: prodData } = await db
-        .from("products")
-        .select("*")
-        .eq("slug", slug)
-        .single()
-      if (prodData) {
-        setProduct(prodData as Product)
-        const { data: imgData } = await db
-          .from("product_images")
-          .select("*")
-          .eq("product_id", prodData.id)
-          .order("sort_order", { ascending: true })
-        if (imgData) setImages(imgData as ProductImage[])
+      try {
+        const res = await fetch(`/api/products/${slug}`)
+        if (!res.ok) { setLoading(false); return }
+        const data = await res.json()
+        setProduct(data)
+
+        // Варианты
+        const productVariants: Variant[] = (data.variants || []).map((v: any) => ({
+          id: v.id,
+          name: v.name,
+          price: parseFloat(v.price),
+          old_price: v.old_price ? parseFloat(v.old_price) : null,
+          currency: v.currency || data.currency,
+          validity_days: v.validity_days,
+          stock: v.stock,
+          description: v.description,
+        }))
+        setVariants(productVariants)
+
+        // Автовыбор первого варианта
+        if (productVariants.length > 0) {
+          setSelectedVariant(productVariants[0])
+        }
+      } catch (err) {
+        console.error('Failed to load product:', err)
       }
       setLoading(false)
     }
     fetchProduct()
   }, [slug])
 
+  const currentPrice = selectedVariant ? selectedVariant.price : (product?.price || 0)
+  const currentOldPrice = selectedVariant?.old_price || product?.old_price || null
+
   const handleAddToCart = () => {
     if (!product) return
     addItem({
-      id: product.id,
+      id: selectedVariant ? selectedVariant.id : product.id,
       productId: product.id,
-      name: product.name,
-      price: product.price,
-      image: images[0]?.url || product.image || "",
+      name: selectedVariant ? `${product.name} — ${selectedVariant.name}` : product.name,
+      price: currentPrice,
+      image: productImages[0] || "",
       slug: product.slug,
+      variantId: selectedVariant?.id || null,
     })
     setAddedToCart(true)
     setTimeout(() => setAddedToCart(false), 2000)
@@ -118,23 +140,22 @@ export default function ProductDetail() {
             <div className="mb-4 overflow-hidden rounded-xl border bg-secondary">
               <img
                 src={
-                  images[activeImage]?.url || product.image ||
-                  `https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=800&q=80`
+                  productImages[activeImage] ||
+                  `https://placehold.co/800x600/f5f5f0/78716c?text=${encodeURIComponent(product.name.substring(0, 30))}`
                 }
-                alt={images[activeImage]?.alt || product.name}
+                alt={product.name}
                 className="aspect-[4/3] w-full object-cover transition-all duration-300 hover:scale-105"
                 onError={(e) => {
                   const i = e.target as HTMLImageElement
                   i.onerror = null
-                  i.src = `https://placehold.co/800x600/f5f5f0/78716c?text=${encodeURIComponent(product.name.substring(0, 30))}`
                 }}
               />
             </div>
-            {images.length > 1 && (
+            {productImages.length > 1 && (
               <div className="flex gap-2">
-                {images.map((img, idx) => (
+                {productImages.map((url, idx) => (
                   <button
-                    key={img.id}
+                    key={idx}
                     onClick={() => setActiveImage(idx)}
                     className={cn(
                       "overflow-hidden rounded-lg border-2 transition-all",
@@ -142,13 +163,12 @@ export default function ProductDetail() {
                     )}
                   >
                     <img
-                      src={img.url}
-                      alt={img.alt || ""}
+                      src={url}
+                      alt=""
                       className="h-16 w-16 object-cover"
                       onError={(e) => {
                         const i = e.target as HTMLImageElement
                         i.onerror = null
-                        i.src = `https://placehold.co/64x64/f5f5f0/78716c?text=${idx + 1}`
                       }}
                     />
                   </button>
@@ -227,22 +247,32 @@ export default function ProductDetail() {
 
             <Separator className="mb-6" />
 
-            {/* Цена */}
+            {/* Цена (с учётом выбранного варианта) */}
             <div className="mb-6">
               <div className="flex items-baseline gap-3">
-                <span className="text-4xl font-bold">{formatPrice(product.price)}</span>
-                {product.old_price && product.old_price > product.price && (
+                <span className="text-4xl font-bold">{formatPrice(currentPrice)}</span>
+                {currentOldPrice && currentOldPrice > currentPrice && (
                   <span className="text-xl text-muted-foreground line-through">
-                    {formatPrice(product.old_price)}
+                    {formatPrice(currentOldPrice)}
                   </span>
                 )}
-                {product.old_price && product.old_price > product.price && (
+                {currentOldPrice && currentOldPrice > currentPrice && (
                   <Badge className="bg-red-500 text-white">
-                    -{Math.round((1 - product.price / product.old_price) * 100)}%
+                    -{Math.round((1 - currentPrice / currentOldPrice) * 100)}%
                   </Badge>
                 )}
               </div>
             </div>
+
+            {/* Выбор варианта */}
+            {variants.length > 0 && (
+              <VariantSelector
+                variants={variants}
+                selectedId={selectedVariant?.id || null}
+                onSelect={setSelectedVariant}
+                formatPrice={formatPrice}
+              />
+            )}
 
             {/* Для обычных товаров — количество и кнопки */}
             {!product.provider_code ? (
