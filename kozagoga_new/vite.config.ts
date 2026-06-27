@@ -57,6 +57,12 @@ export default defineConfig({
     },
     // Временные файлы сервера в .vite вместо node_modules/.vite-temp
     fs: {},
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+    },
   },
   
 })

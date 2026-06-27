@@ -86,7 +86,7 @@ export default function createProductsRouter() {
         `SELECT
           p.id, p.name, p.slug, p.short_description,
           p.price_min, p.price_max, p.currency,
-          p.images->>0 AS image_url,
+          p.image, p.images->>0 AS image_url,
           p.delivery_time, p.region, p.rating, p.review_count,
           p.is_featured, p.seller_name, p.seller_verified,
           p.product_type, p.delivery_type,
