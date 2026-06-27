@@ -79,9 +79,14 @@ export default function createCartRouter() {
         return res.status(400).json({ error: 'quantity обязателен и >= 0' })
       }
 
+      if (quantity === 0) {
+        await removeCartItem(req.params.id)
+        return res.json({ deleted: true })
+      }
+
       const item = await updateCartItemQuantity(req.params.id, quantity)
       if (!item) {
-        return res.json({ deleted: true })
+        return res.status(404).json({ error: 'Товар не найден в корзине' })
       }
 
       res.json(item)

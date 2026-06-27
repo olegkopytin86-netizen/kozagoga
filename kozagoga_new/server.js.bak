@@ -57,7 +57,22 @@ let servicesCacheTime = 0
 const app = express()
 
 // ─── Новые API роуты (SRS Modules) — Express 5 workaround ─────
+// Монтируется сразу после создания app (до любых middleware)
+// Модульные роутеры (SRS Modules)
+app.use('/api/cart', createCartRouter())
+app.use('/api/deliveries', createDeliveryRouter())
+app.use('/api/wishlist', createWishlistRouter())
+app.use('/api', createReferralRouter())
+app.use('/api/admin/promotions', createCouponAdminRouter())
+app.use('/api/bundles', createBundlesRouter())
+app.use('/api/subscriptions', createSubscriptionRouter())
+app.use('/api/gifts', createGiftsRouter())
+app.use('/api', createLoyaltyRouter())
+app.use('/api', createSupportRouter())
+app.use('/api/products', createProductsRouter())
+app.use('/api/categories', createCategoriesRouter())
 
+console.log('[server] Module routers mounted')
 
 app.use(cors({
   origin: process.env.CORS_ORIGIN
@@ -187,26 +202,9 @@ function authenticate(req, res, next) {
 }
 app.use(authenticate)
 
-// Модульные роутеры (SRS Modules) — после express.json() и authenticate
-app.use('/api/cart', createCartRouter())
-app.use('/api/deliveries', createDeliveryRouter())
-app.use('/api/wishlist', createWishlistRouter())
-app.use('/api', createReferralRouter())
-app.use('/api/admin/promotions', createCouponAdminRouter())
-app.use('/api/bundles', createBundlesRouter())
-app.use('/api/subscriptions', createSubscriptionRouter())
-app.use('/api/gifts', createGiftsRouter())
-app.use('/api', createLoyaltyRouter())
-app.use('/api', createSupportRouter())
-app.use('/api/products', createProductsRouter())
-app.use('/api/categories', createCategoriesRouter())
-console.log('[server] Module routers mounted')
-
 function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: 'Не авторизован' })
-    // superadmin имеет все права
-    if (req.user.role === 'superadmin') return next()
     if (!roles.includes(req.user.role)) return res.status(403).json({ error: 'Недостаточно прав' })
     next()
   }
@@ -599,8 +597,7 @@ app.post('/api/cancel', requireRole('admin'), async (req, res) => {
 // FR-35: POST /api/orders — создание заказа
 app.post('/api/orders', requireAuth, rateLimit(getRateLimits().orders || 30), async (req, res) => {
   try {
-    const { items, payment_method: rawPaymentMethod } = req.body
-    const payment_method = sanitizeTextField(rawPaymentMethod)
+    const { items, payment_method } = req.body
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Необходимо передать товары' })
     }
@@ -1485,7 +1482,7 @@ app.get('/api/confirm-status/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params
     const result = await pool.query(
-      `SELECT id, payment_status, status, provider_status, updated_at FROM orders WHERE id = $1`,
+      `SELECT id, payment_status, status, provider_status, provider_code, updated_at FROM orders WHERE id = $1`,
       [orderId]
     )
     if (result.rows.length === 0) {
