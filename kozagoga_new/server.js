@@ -10,6 +10,9 @@ import dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { getPool } from './src/lib/pool.js'
+import createCartRouter from './src/routes/cart.js'
+import createProductsRouter from './src/routes/products.js'
+import createCategoriesRouter from './src/routes/categories.js'
 
 dotenv.config()
 
@@ -45,44 +48,12 @@ const app = express()
 
 // ─── Новые API роуты (SRS Modules) — Express 5 workaround ─────
 // Монтируется сразу после создания app (до любых middleware)
-app.use('/api/cart', (await import('./src/routes/cart.js')).default())
+// Модульные роутеры (SRS Modules)
+app.use('/api/cart', createCartRouter())
+app.use('/api/products', createProductsRouter())
+app.use('/api/categories', createCategoriesRouter())
 
-app.get('/api/products', async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      'SELECT id, name, slug, price, price_min, price_max, images->>0 AS image_url, rating, review_count, stock, is_active FROM products WHERE is_active = true ORDER BY sort_order, created_at DESC LIMIT 50'
-    )
-    res.json({ items: rows, pagination: { page: 1, limit: 50, total: rows.length } })
-  } catch(err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-app.get('/api/products/:slug', async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      'SELECT p.*, c.name AS category_name, c.slug AS category_slug FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE (p.slug=$1 OR p.id::text=$1) AND p.is_active=true LIMIT 1',
-      [req.params.slug]
-    )
-    if (!rows[0]) return res.status(404).json({ error: 'Not found' })
-    res.json(rows[0])
-  } catch(err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-app.get('/api/categories', async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      'SELECT id, name, slug, description, icon, sort_order, (SELECT COUNT(*) FROM products WHERE category_id=categories.id AND is_active=true) AS product_count FROM categories WHERE is_active=true ORDER BY sort_order'
-    )
-    res.json(rows)
-  } catch(err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-console.log('[server] SRS routes mounted at top')
+console.log('[server] Module routers mounted')
 
 app.use(cors({
   origin: process.env.CORS_ORIGIN
@@ -1522,53 +1493,6 @@ app.get('/api/health', async (req, res) => {
     res.status(503).json({ status: 'error', database: 'disconnected' })
   }
 })
-
-// ─── Новые API роуты (SRS Modules) ─────────────────────
-
-// Express 5.2.1: используем app.route() вместо app.get() для явной регистрации
-app.route('/api/products').get(async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      'SELECT id, name, slug, price, price_min, price_max, images->>0 AS image_url, rating, review_count, stock FROM products WHERE is_active = true ORDER BY sort_order, created_at DESC LIMIT 50'
-    )
-    res.json({ items: rows, pagination: { page: 1, limit: 50, total: rows.length } })
-  } catch(err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-app.route('/api/products/:slug').get(async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      'SELECT p.*, c.name AS category_name, c.slug AS category_slug FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE (p.slug=$1 OR p.id::text=$1) AND p.is_active=true LIMIT 1',
-      [req.params.slug]
-    )
-    if (!rows[0]) return res.status(404).json({ error: 'Not found' })
-    res.json(rows[0])
-  } catch(err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-app.route('/api/categories').get(async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      'SELECT id, name, slug, description, icon, sort_order, (SELECT COUNT(*) FROM products WHERE category_id=categories.id AND is_active=true) AS product_count FROM categories WHERE is_active=true ORDER BY sort_order'
-    )
-    res.json(rows)
-  } catch(err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-app.route('/api/cart').get(async (req, res) => {
-  // Proxy to cart router
-  const cartMod = await import('./src/routes/cart.js')
-  const cartRouter = cartMod.default()
-  // Can't easily proxy, just return empty
-  res.json({ items: [], total: 0 })
-})
-
 
 // ─── Seed endpoint (только для админа) ───────────────────
 app.post('/api/seed', requireAuth, async (req, res) => {
