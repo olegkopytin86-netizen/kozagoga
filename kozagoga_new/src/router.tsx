@@ -17,6 +17,9 @@ import OrderDetail from './pages/OrderDetail'
 import Profile from './pages/Profile'
 import AdminDashboard from './pages/AdminDashboard'
 import WalletPage from './pages/Wallet'
+import TicketList from './pages/TicketList'
+import TicketForm from './pages/TicketForm'
+import TicketDetail from './pages/TicketDetail'
 import NotFound from './pages/NotFound'
 import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute'
 
@@ -41,6 +44,18 @@ export const router = createBrowserRouter([
       {
         path: 'dashboard/wallet',
         element: <ProtectedRoute><WalletPage /></ProtectedRoute>,
+      },
+      {
+        path: 'dashboard/support',
+        element: <ProtectedRoute><TicketList /></ProtectedRoute>,
+      },
+      {
+        path: 'dashboard/support/new',
+        element: <ProtectedRoute><TicketForm /></ProtectedRoute>,
+      },
+      {
+        path: 'dashboard/support/:id',
+        element: <ProtectedRoute><TicketDetail /></ProtectedRoute>,
       },
       { path: 'checkout', element: <Checkout /> },
       {

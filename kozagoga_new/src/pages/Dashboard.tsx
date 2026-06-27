@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-import { User, ShoppingCart, Settings, CreditCard, LogOut, ArrowRight, Wallet as WalletIcon } from "lucide-react"
+import { User, ShoppingCart, Settings, CreditCard, LogOut, ArrowRight, Wallet as WalletIcon, MessageCircle, Gift, Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useAuth } from "@/contexts/AuthContext"
@@ -40,6 +40,20 @@ export default function Dashboard() {
       icon: Settings,
       href: "/dashboard/settings",
       color: "text-muted-foreground",
+    },
+    {
+      title: "Поддержка",
+      description: "Обращения и тикеты",
+      icon: MessageCircle,
+      href: "/dashboard/support",
+      color: "text-blue-500",
+    },
+    {
+      title: "Избранное",
+      description: "Сохранённые товары",
+      icon: Heart,
+      href: "/dashboard/favorites",
+      color: "text-red-500",
     },
   ]
 
