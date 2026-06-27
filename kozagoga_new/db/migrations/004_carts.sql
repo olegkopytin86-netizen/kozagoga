@@ -13,18 +13,16 @@ CREATE TABLE IF NOT EXISTS carts (
     -- active | checked_out | abandoned
   total           NUMERIC(10,2) DEFAULT 0,
   currency        VARCHAR(3) DEFAULT 'RUB',
-  coupon_id       UUID REFERENCES coupons(id),
+  coupon_id       UUID, -- FK added in 014_add_coupon_fks.sql
   discount_amount NUMERIC(10,2) DEFAULT 0,
   notes           TEXT,
   created_at      TIMESTAMPTZ DEFAULT NOW(),
   updated_at      TIMESTAMPTZ DEFAULT NOW(),
-  expires_at      TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '24 hours'),
-    -- автоочистка через 24ч
-
-  -- Одна активная корзина на пользователя (или на сессию)
-  CONSTRAINT uq_cart_user_active UNIQUE (user_id, status) 
-    WHERE status = 'active'
+  expires_at      TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '24 hours')
 );
+
+-- Одна активная корзина на пользователя (partial unique index)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_cart_user_active ON carts(user_id) WHERE status = 'active';
 
 CREATE INDEX IF NOT EXISTS idx_carts_user ON carts(user_id) WHERE status = 'active';
 CREATE INDEX IF NOT EXISTS idx_carts_session ON carts(session_id) WHERE session_id IS NOT NULL AND status = 'active';

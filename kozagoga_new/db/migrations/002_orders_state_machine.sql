@@ -11,7 +11,7 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS subtotal            NUMERIC(10,2);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_amount          NUMERIC(10,2) DEFAULT 0;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount     NUMERIC(10,2) DEFAULT 0;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS cashback_used       NUMERIC(10,2) DEFAULT 0;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS coupon_id           UUID REFERENCES coupons(id);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS coupon_id           UUID; -- FK added in 014_add_coupon_fks.sql
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method      VARCHAR(50);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_gateway     VARCHAR(50);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS gateway_payment_id  VARCHAR(255);
