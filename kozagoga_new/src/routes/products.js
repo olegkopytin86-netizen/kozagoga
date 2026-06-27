@@ -137,6 +137,30 @@ export default function createProductsRouter() {
     }
   })
 
+  // ─── GET /api/products/autocomplete — автодополнение ──
+  // Должен быть до /:slug чтобы избежать конфликта
+  router.get('/autocomplete', async (req, res) => {
+    try {
+      const q = req.query.q
+      if (!q || q.length < 2) return res.json([])
+
+      const { rows } = await readPool.query(
+        `SELECT name, slug, images->>0 AS image_url, price_min, price_max,
+                similarity(name, $1) AS sim
+         FROM products
+         WHERE is_active = true
+           AND (name % $1 OR name ILIKE $1 || '%')
+         ORDER BY sim DESC
+         LIMIT 8`,
+        [q]
+      )
+      res.json(rows)
+    } catch (err) {
+      console.error('GET /api/products/autocomplete error:', err)
+      res.status(500).json({ error: 'Ошибка автодополнения' })
+    }
+  })
+
   // ─── GET /api/products/:slug — детали товара ────────
   router.get('/:slug', async (req, res) => {
     try {
