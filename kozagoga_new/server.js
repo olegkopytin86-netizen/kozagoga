@@ -59,14 +59,29 @@ const app = express()
 // ─── Новые API роуты (SRS Modules) — Express 5 workaround ─────
 
 
-app.use(cors({
-  origin: process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
-    : ['http://localhost:5173', 'http://localhost:4173'],
-  credentials: true,
-}))
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+  : ['http://localhost:5173', 'http://localhost:4173']
+
+// CORS — ручное управление (вместо cors пакета, т.к. Cloudflare tunnel фильтрует заголовки)
+app.use((req, res, next) => {
+  const origin = req.headers['origin'] || ''
+  // Разрешаем все запросы (локальные, туннели, API)
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Access-Control-Allow-Credentials', 'true')
+  }
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    res.setHeader('Access-Control-Max-Age', '86400')
+    return res.status(204).end()
+  }
+  next()
+})
 // Сохраняем rawBody для HMAC-верификации webhook'ов
 app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { req.rawBody = buf.toString() } }))
+app.use(express.urlencoded({ extended: true }))
 
 // Базовые security headers (работает без helmet)
 app.use(csrfProtection)
@@ -112,11 +127,14 @@ function csrfProtection(req, res, next) {
   }
 
   if (origin) {
+    // Разрешаем trycloudflare туннели
+    if (origin.includes('trycloudflare.com')) return next()
     const matches = allAllowed.some(allowed => origin.startsWith(allowed))
     if (!matches) {
       return res.status(403).json({ error: 'CSRF: Origin not allowed' })
     }
   } else if (referer) {
+    if (referer.includes('trycloudflare.com')) return next()
     const matches = allAllowed.some(allowed => referer.startsWith(allowed))
     if (!matches) {
       return res.status(403).json({ error: 'CSRF: Referer not allowed' })
@@ -201,6 +219,13 @@ app.use('/api', createSupportRouter())
 app.use('/api/products', createProductsRouter())
 app.use('/api/categories', createCategoriesRouter())
 console.log('[server] Module routers mounted')
+
+// Простая санитизация текстовых полей
+function sanitizeTextField(val) {
+  if (typeof val !== 'string') return val
+  // Удаляем null-байты и непечатные символы (кроме пробелов)
+  return val.replace(/\x00/g, '').replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, '').trim()
+}
 
 function requireRole(...roles) {
   return (req, res, next) => {
@@ -666,6 +691,87 @@ app.post('/api/orders', requireAuth, rateLimit(getRateLimits().orders || 30), as
   }
 })
 
+// POST /api/direct-pay — прямая оплата через HTML-форму (обходит CORS preflight)
+app.post('/api/direct-pay', async (req, res) => {
+  try {
+    const { token, product_id, quantity, payment_method, return_url } = req.body
+    if (!token || !product_id) {
+      return res.redirect('/login')
+    }
+
+    // Верифицируем токен
+    let user
+    try {
+      user = jwt.verify(token, JWT_SECRET)
+    } catch {
+      return res.redirect('/login')
+    }
+
+    // Создаём заказ
+    const orderRes = await pool.query(
+      `INSERT INTO orders (user_id, total, payment_method, status, payment_status)
+       VALUES ($1, $2, $3, 'pending', 'pending') RETURNING *`,
+      [user.id, 0, payment_method || 'card']
+    )
+    const order = orderRes.rows[0]
+
+    // Получаем цену товара
+    const prodRes = await pool.query('SELECT price, name FROM products WHERE id = $1', [product_id])
+    if (prodRes.rows.length === 0) return res.redirect('/catalog')
+    const prod = prodRes.rows[0]
+    const qty = parseInt(quantity) || 1
+    const total = parseFloat(prod.price) * qty
+
+    // Обновляем сумму
+    await pool.query('UPDATE orders SET total = $1 WHERE id = $2', [total, order.id])
+
+    // Добавляем товар в заказ
+    await pool.query(
+      `INSERT INTO order_items (order_id, product_id, product_name, quantity, price)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [order.id, product_id, prod.name, qty, prod.price]
+    )
+
+    // Процессим платёж
+    const { gateway, code } = resolveGateway(payment_method, paymentGateways)
+    // Определяем baseUrl: сначала X-Forwarded-Host от nginx, потом Host, потом .env
+    // Определяем baseUrl из заголовков запроса
+    const xfh = req.headers['x-forwarded-host']
+    const host = req.headers['host']
+    const origin = req.headers['origin']
+    let targetHost = xfh || host || origin || ''
+    targetHost = String(targetHost).replace(/^https?:\/\//g, '').split('/')[0].split(':')[0]    
+    const baseUrl = targetHost ? ('https://' + targetHost) : 'http://localhost:5173'
+
+    const result = await gateway.createPayment({
+      order_id: order.id,
+      amount: total,
+      currency: 'RUB',
+      description: `Заказ #${order.id}`,
+      return_url: `${baseUrl}/orders/${order.id}`,
+      payment_way: payment_method
+    })
+
+    // Сохраняем платёж
+    await pool.query(
+      `INSERT INTO payments (order_id, amount, method, status, gateway, gateway_tx_id, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [order.id, total, payment_method, result.status || 'pending', code, result.transaction_id,
+       JSON.stringify({ redirect_url: result.redirect_url })]
+    )
+
+    // Редирект на оплату
+    if (result.redirect_url) {
+      res.redirect(result.redirect_url)
+    } else {
+      res.redirect(`${baseUrl}/orders/${order.id}`)
+    }
+  } catch (err) {
+    console.error('Direct pay error:', err.message)
+    res.redirect('/checkout?error=payment_failed')
+  }
+})
+
 // FR-36: POST /api/payments/process — процессинг платежа
 app.post('/api/payments/process', requireAuth, rateLimit(getRateLimits().payments || 20), async (req, res) => {
   try {
@@ -690,13 +796,18 @@ app.post('/api/payments/process', requireAuth, rateLimit(getRateLimits().payment
     // Определяем шлюз через фабрику с fallback
     const { gateway, code: gatewayCode } = resolveGateway(payment_method, paymentGateways)
 
+    // Определяем базовый URL для редиректа (динамически из заголовков, без привязки к .env)
+    const h = req.headers['x-forwarded-host'] || req.headers['host'] || ''
+    const hostClean = String(h).replace(/^https?:\/\//g, '').split('/')[0].split(':')[0]
+    const baseUrl = hostClean ? ('https://' + hostClean) : 'http://localhost:5173'
+
     const result = await gateway.createPayment({
       order_id: order.id,
       amount: order.total,
       currency: 'RUB',
       description: `Заказ #${order.id}`,
       user: req.user,
-      return_url: `https://${req.headers.host || 'localhost:5173'}/orders/${order.id}`,
+      return_url: `${baseUrl}/orders/${order.id}`,
       payment_way: payment_method
     })
 

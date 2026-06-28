@@ -153,6 +153,12 @@ export default function Cart() {
                     Оформить заказ
                   </Button>
                 </Link>
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
+                  <span className="mr-1">Принимаем к оплате:</span>
+                  <span className="inline-flex items-center gap-1 rounded-md border bg-card px-2 py-0.5 font-medium">🏦 СберПэй</span>
+                  <span className="inline-flex items-center gap-1 rounded-md border bg-card px-2 py-0.5 font-medium">📱 СБП</span>
+                  <span className="inline-flex items-center gap-1 rounded-md border bg-card px-2 py-0.5 font-medium">💳 Visa, Mastercard, Мир</span>
+                </div>
               </CardContent>
             </Card>
           </div>

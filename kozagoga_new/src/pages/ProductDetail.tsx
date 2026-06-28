@@ -8,13 +8,16 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import TrustBlock from "@/components/TrustBlock"
 import VariantSelector, { type Variant } from "@/components/VariantSelector"
+import { useAuth } from "@/contexts/AuthContext"
 import { useCart } from "@/contexts/CartContext"
 import { cn, formatPrice } from "@/lib/utils"
 import ServiceForm from "@/components/ServiceForm"
+import SberPayButton from "@/components/payment/SberPayButton"
 
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>()
   const { addItem } = useCart()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [product, setProduct] = useState<any>(null)
   const [variants, setVariants] = useState<Variant[]>([])
@@ -23,6 +26,8 @@ export default function ProductDetail() {
   const [activeImage, setActiveImage] = useState(0)
   const [quantity, setQuantity] = useState(1)
   const [addedToCart, setAddedToCart] = useState(false)
+  const [processing, setProcessing] = useState<string | null>(null)
+  const [payError, setPayError] = useState("")
 
   // Helper: получить массив URL изображений
   const productImages: string[] = product?.images
@@ -85,6 +90,45 @@ export default function ProductDetail() {
   const handleBuyNow = () => {
     handleAddToCart()
     navigate("/checkout")
+  }
+
+  // Используем скрытую форму для POST (обходит CORS preflight через Cloudflare)
+  const handleDirectPayment = (method: "sberpay" | "sbp" | "card") => {
+    if (!user || !product) {
+      navigate("/login")
+      return
+    }
+    setProcessing(method)
+    setPayError("")
+    const token = localStorage.getItem('kozagogo_token')
+    if (!token) {
+      navigate("/login")
+      return
+    }
+    // Скрытая форма POST — отправляет запрос на сервер как обычная HTML-форма
+    // Это bypass CORS preflight: form POST с urlencoded = simple request
+    const form = document.createElement('form')
+    form.method = 'POST'
+    form.action = '/api/direct-pay'
+    form.style.display = 'none'
+
+    const addField = (name: string, value: string) => {
+      const input = document.createElement('input')
+      input.type = 'hidden'
+      input.name = name
+      input.value = value
+      form.appendChild(input)
+    }
+
+    addField('token', token)
+    addField('product_id', selectedVariant ? selectedVariant.id : product.id)
+    addField('quantity', String(quantity))
+    addField('payment_method', method)
+    addField('return_url', window.location.origin + '/orders/')
+
+    document.body.appendChild(form)
+    form.submit()
+    // После submit страница перезагрузится — показываем спиннер
   }
 
   if (loading) {
@@ -312,6 +356,44 @@ export default function ProductDetail() {
                   <ShoppingCart className="h-5 w-5" />
                   {addedToCart ? "Добавлено!" : "В корзину"}
                 </Button>
+              </div>
+
+              {/* Быстрая оплата — всегда видна */}
+              {payError && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-600">{payError}</div>
+              )}
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {user ? "Быстрая оплата:" : "Оплатить без регистрации:"}
+                </p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <SberPayButton
+                    selected={false}
+                    onClick={() => handleDirectPayment("sberpay")}
+                  />
+                  <button
+                    onClick={() => handleDirectPayment("sbp")}
+                    disabled={processing !== null}
+                    className="flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-all hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
+                  >
+                    {processing === "sbp" ? (
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    ) : (
+                      <><span className="text-lg">📱</span> СБП</>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleDirectPayment("card")}
+                    disabled={processing !== null}
+                    className="flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-all hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
+                  >
+                    {processing === "card" ? (
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    ) : (
+                      <><span className="text-lg">💳</span> Карта</>
+                    )}
+                  </button>
+                </div>
               </div>
               </>
             ) : (

@@ -190,7 +190,25 @@ export default function Header() {
                 )}
               </Button>
             </Link>
+
+            {/* Персонаж */}
+            <div className="hidden sm:flex items-center ml-1">
+              <img
+                src="/header-character.jpg"
+                alt="Kozagoga"
+                className="h-9 w-9 md:h-10 md:w-10 rounded-full object-cover ring-2 ring-koz-300/60 shadow-sm transition-transform hover:scale-110 hover:ring-koz-400"
+              />
+            </div>
           </nav>
+
+          {/* Персонаж (мобильный) */}
+          <div className="flex sm:hidden items-center">
+            <img
+              src="/header-character.jpg"
+              alt="Kozagoga"
+              className="h-7 w-7 rounded-full object-cover ring-2 ring-koz-300/60 shadow-sm transition-transform hover:scale-110"
+            />
+          </div>
 
           {/* Мобильное меню */}
           <button
