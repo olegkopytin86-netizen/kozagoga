@@ -48,11 +48,11 @@ export default function Header() {
         <div className="flex h-16 items-center justify-between gap-4">
           {/* Логотип */}
           <Link to="/" className="flex items-center gap-2 shrink-0">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 font-bold text-white text-sm shadow-sm">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FF7A00] font-bold text-white text-sm shadow-sm">
               К
             </div>
-            <span className="hidden text-xl font-bold sm:block bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">
-              ciframall
+            <span className="hidden text-xl font-bold sm:block">
+              <span className="text-white">Cifra</span><span className="text-[#FF7A00] drop-shadow-[0_0_8px_rgba(255,122,0,0.3)]">Mall</span>
             </span>
           </Link>
 
@@ -195,8 +195,8 @@ export default function Header() {
             <div className="hidden sm:flex items-center ml-1">
               <img
                 src="/header-character.jpg"
-                alt="ciframall"
-                className="h-9 w-9 md:h-10 md:w-10 rounded-full object-cover ring-2 ring-purple-500/30 shadow-sm transition-transform hover:scale-110 hover:ring-purple-500/50"
+                alt="CifraMall"
+                className="h-9 w-9 md:h-10 md:w-10 rounded-full object-cover ring-2 ring-[#FF7A00]/30 shadow-sm transition-transform hover:scale-110 hover:ring-[#FF7A00]/50"
               />
             </div>
           </nav>
@@ -205,8 +205,8 @@ export default function Header() {
           <div className="flex sm:hidden items-center">
             <img
               src="/header-character.jpg"
-              alt="ciframall"
-              className="h-7 w-7 rounded-full object-cover ring-2 ring-purple-500/30 shadow-sm transition-transform hover:scale-110"
+              alt="CifraMall"
+              className="h-7 w-7 rounded-full object-cover ring-2 ring-[#FF7A00]/30 shadow-sm transition-transform hover:scale-110"
             />
           </div>
 
