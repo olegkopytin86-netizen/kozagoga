@@ -32,3 +32,5 @@ dist-ssr
 .env.local
 .env.*.local
 *.bak
+.env.backup
+public/kopytin.p12

@@ -11,9 +11,9 @@ const contactMethods = [
   {
     icon: Mail,
     title: "Email",
-    value: "support@kozagogo.ru",
+    value: "support@ciframall.net",
     description: "Ответим в течение 1 часа",
-    href: "mailto:support@kozagogo.ru",
+    href: "mailto:support@ciframall.net",
   },
   {
     icon: Phone,
@@ -190,7 +190,7 @@ export default function Contacts() {
               <CardContent className="p-6">
                 <h2 className="mb-4 text-xl font-semibold">Реквизиты</h2>
                 <div className="space-y-2 text-sm text-muted-foreground">
-                  <p>ИП Козагога</p>
+                  <p>ИП ciframall</p>
                   <p>ИНН: 1234567890</p>
                   <p>ОГРН: 123456789012345</p>
                   <p>Юридический адрес: г. Москва, ул. Цифровая, д. 1, оф. 301</p>

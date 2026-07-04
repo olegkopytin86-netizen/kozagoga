@@ -1,547 +1,252 @@
-import { useEffect, useState } from "react"
-import { useParams, Link, useNavigate } from "react-router-dom"
-import { Star, Clock, MapPin, Shield, CheckCircle, ChevronLeft, Zap, Package, ShoppingCart, Info, MessageCircle, HelpCircle, ChevronDown, Minus, Plus } from "lucide-react"
+import { useState } from "react"
+import { Link, useParams, useNavigate } from "react-router-dom"
+import { ChevronLeft, Star, Building2, Smartphone, CreditCard, Shield, Loader2, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import TrustBlock from "@/components/TrustBlock"
-import VariantSelector, { type Variant } from "@/components/VariantSelector"
-import { useAuth } from "@/contexts/AuthContext"
-import { useCart } from "@/contexts/CartContext"
-import { cn, formatPrice } from "@/lib/utils"
-import ServiceForm from "@/components/ServiceForm"
-import SberPayButton from "@/components/payment/SberPayButton"
+import { Card, CardContent } from "@/components/ui/card"
+import { popularProducts } from "@/data/products"
+import { createOrder, processPayment } from "@/lib/api"
+
+type PaymentMethod = "sberpay" | "sbp" | "card"
 
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>()
-  const { addItem } = useCart()
-  const { user } = useAuth()
   const navigate = useNavigate()
-  const [product, setProduct] = useState<any>(null)
-  const [variants, setVariants] = useState<Variant[]>([])
-  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [activeImage, setActiveImage] = useState(0)
-  const [quantity, setQuantity] = useState(1)
-  const [addedToCart, setAddedToCart] = useState(false)
-  const [processing, setProcessing] = useState<string | null>(null)
-  const [payError, setPayError] = useState("")
+  const product = popularProducts.find((p) => p.id === slug)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [error, setError] = useState("")
+  const [isSuccess, setIsSuccess] = useState(false)
 
-  // Helper: получить массив URL изображений
-  const productImages: string[] = product?.images
-    ? (Array.isArray(product.images) ? product.images : [])
-    : product?.image ? [product.image] : []
+  const handleSberPayDeeplinks = (deepLinks: string[], fallbackUrl: string) => {
+    const ua = navigator.userAgent
+    const isIOS = /iPhone|iPad|iPod/i.test(ua)
+    const isAndroid = /Android/i.test(ua)
 
-  // Загружаем товар и варианты через API
-  useEffect(() => {
-    const fetchProduct = async () => {
-      if (!slug) return
-      try {
-        const res = await fetch(`/api/products/${slug}`)
-        if (!res.ok) { setLoading(false); return }
-        const data = await res.json()
-        setProduct(data)
-
-        // Варианты
-        const productVariants: Variant[] = (data.variants || []).map((v: any) => ({
-          id: v.id,
-          name: v.name,
-          price: parseFloat(v.price),
-          old_price: v.old_price ? parseFloat(v.old_price) : null,
-          currency: v.currency || data.currency,
-          validity_days: v.validity_days,
-          stock: v.stock,
-          description: v.description,
-        }))
-        setVariants(productVariants)
-
-        // Автовыбор первого варианта
-        if (productVariants.length > 0) {
-          setSelectedVariant(productVariants[0])
+    if (isIOS) {
+      // iOS: перебор диплинков по гайду Сбера
+      const tryLinks = (links: string[], idx: number) => {
+        if (idx >= links.length) {
+          window.location.href = "https://www.sberbank.ru/ru/person/payments/online_sberpay"
+          return
         }
-      } catch (err) {
-        console.error('Failed to load product:', err)
+        window.location.href = links[idx]
+        setTimeout(() => tryLinks(links, idx + 1), 200)
       }
-      setLoading(false)
+      tryLinks(deepLinks, 0)
+    } else if (isAndroid) {
+      // Android: Intent → web fallback через таймаут
+      const timeout = setTimeout(() => {
+        window.location.href = fallbackUrl
+      }, 2500)
+      const handleVisibility = () => {
+        if (document.hidden) {
+          clearTimeout(timeout)
+          document.removeEventListener("visibilitychange", handleVisibility)
+        }
+      }
+      document.addEventListener("visibilitychange", handleVisibility)
+      window.location.href = deepLinks[0] || fallbackUrl
+    } else {
+      // Desktop → сразу веб-редирект
+      window.location.href = fallbackUrl
     }
-    fetchProduct()
-  }, [slug])
+  }
 
-  const currentPrice = selectedVariant ? selectedVariant.price : (product?.price || 0)
-  const currentOldPrice = selectedVariant?.old_price || product?.old_price || null
-
-  const handleAddToCart = () => {
+  const handlePayment = async (method: PaymentMethod) => {
     if (!product) return
-    addItem({
-      id: selectedVariant ? selectedVariant.id : product.id,
-      productId: product.id,
-      name: selectedVariant ? `${product.name} — ${selectedVariant.name}` : product.name,
-      price: currentPrice,
-      image: productImages[0] || "",
-      slug: product.slug,
-      variantId: selectedVariant?.id || null,
-    })
-    setAddedToCart(true)
-    setTimeout(() => setAddedToCart(false), 2000)
-  }
+    setError("")
+    setIsProcessing(true)
+    setPaymentMethod(method)
 
-  const handleBuyNow = () => {
-    handleAddToCart()
-    navigate("/checkout")
-  }
+    try {
+      // Создаём заказ с одним товаром
+      const order = await createOrder(
+        [{ product_id: product.id, quantity: 1 }],
+        method
+      )
 
-  // Используем скрытую форму для POST (обходит CORS preflight через Cloudflare)
-  const handleDirectPayment = (method: "sberpay" | "sbp" | "card") => {
-    if (!user || !product) {
-      navigate("/login")
-      return
+      // Процессинг платежа
+      const payment = await processPayment(order.id, method)
+
+      if (payment.redirect_url) {
+        if (method === "sberpay" && payment.deep_links?.length > 0) {
+          handleSberPayDeeplinks(payment.deep_links, payment.redirect_url)
+          return
+        }
+        // Обычный редирект (карты, СБП)
+        window.location.href = payment.redirect_url
+        return
+      }
+
+      // Успех без редиректа
+      setIsSuccess(true)
+    } catch (err: any) {
+      setError(err.message || "Ошибка оплаты. Попробуйте снова.")
+    } finally {
+      setIsProcessing(false)
     }
-    setProcessing(method)
-    setPayError("")
-    const token = localStorage.getItem('kozagogo_token')
-    if (!token) {
-      navigate("/login")
-      return
-    }
-    // Скрытая форма POST — отправляет запрос на сервер как обычная HTML-форма
-    // Это bypass CORS preflight: form POST с urlencoded = simple request
-    const form = document.createElement('form')
-    form.method = 'POST'
-    form.action = '/api/direct-pay'
-    form.style.display = 'none'
-
-    const addField = (name: string, value: string) => {
-      const input = document.createElement('input')
-      input.type = 'hidden'
-      input.name = name
-      input.value = value
-      form.appendChild(input)
-    }
-
-    addField('token', token)
-    addField('product_id', selectedVariant ? selectedVariant.id : product.id)
-    addField('quantity', String(quantity))
-    addField('payment_method', method)
-    addField('return_url', window.location.origin + '/orders/')
-
-    document.body.appendChild(form)
-    form.submit()
-    // После submit страница перезагрузится — показываем спиннер
-  }
-
-  if (loading) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <Skeleton className="mb-6 h-6 w-32" />
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          <Skeleton className="aspect-[4/3] w-full rounded-xl" />
-          <div className="space-y-4">
-            <Skeleton className="h-8 w-3/4" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-10 w-32" />
-            <Skeleton className="h-12 w-48" />
-          </div>
-        </div>
-      </div>
-    )
   }
 
   if (!product) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-20 text-center sm:px-6 lg:px-8">
-        <Package className="mx-auto mb-4 h-16 w-16 text-muted-foreground" />
-        <h2 className="mb-2 text-2xl font-bold">Товар не найден</h2>
-        <p className="mb-6 text-muted-foreground">Возможно, он был удалён или ссылка неверна</p>
-        <Link to="/catalog">
-          <Button>Вернуться в каталог</Button>
-        </Link>
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+        <h2 className="text-2xl font-bold">Товар не найден</h2>
+        <Link to="/" className="text-primary hover:underline">Вернуться на главную</Link>
       </div>
     )
   }
 
-  const faq = (product.faq as { question: string; answer: string }[]) || []
-  const features = (product.features as string[]) || []
-  const reviews: { author: string; rating: number; text: string; date: string }[] = []
+  if (isSuccess) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center p-12 text-center">
+            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
+              <CheckCircle className="h-10 w-10 text-emerald-600" />
+            </div>
+            <h2 className="mb-2 text-2xl font-bold">Заказ оплачен!</h2>
+            <p className="mb-6 text-muted-foreground">
+              Товар будет отправлен на ваш email в течение нескольких минут.
+            </p>
+            <div className="flex gap-4">
+              <Button onClick={() => navigate("/orders")}>Мои заказы</Button>
+              <Button variant="outline" onClick={() => navigate("/")}>На главную</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
-    <div>
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Хлебные крошки */}
-        <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-          <Link to="/" className="hover:text-primary transition-colors">Главная</Link>
-          <span>/</span>
-          <Link to="/catalog" className="hover:text-primary transition-colors">Каталог</Link>
-          <span>/</span>
-          <span className="text-foreground">{product.name}</span>
-        </nav>
+    <div className="bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 min-h-screen">
+      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Назад */}
+        <Link
+          to="/"
+          className="mb-6 inline-flex items-center gap-1 text-sm text-gray-400 transition-colors hover:text-white"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Назад к товарам
+        </Link>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          {/* Изображения */}
-          <div>
-            <div className="mb-4 overflow-hidden rounded-xl border bg-secondary">
-              <img
-                src={
-                  productImages[activeImage] ||
-                  `https://placehold.co/800x600/f5f5f0/78716c?text=${encodeURIComponent(product.name.substring(0, 30))}`
-                }
-                alt={product.name}
-                className="aspect-[4/3] w-full object-cover transition-all duration-300 hover:scale-105"
-                onError={(e) => {
-                  const i = e.target as HTMLImageElement
-                  i.onerror = null
-                }}
-              />
-            </div>
-            {productImages.length > 1 && (
-              <div className="flex gap-2">
-                {productImages.map((url, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveImage(idx)}
-                    className={cn(
-                      "overflow-hidden rounded-lg border-2 transition-all",
-                      idx === activeImage ? "border-primary ring-1 ring-primary" : "border-transparent hover:border-primary/50"
-                    )}
-                  >
-                    <img
-                      src={url}
-                      alt=""
-                      className="h-16 w-16 object-cover"
-                      onError={(e) => {
-                        const i = e.target as HTMLImageElement
-                        i.onerror = null
-                      }}
-                    />
-                  </button>
-                ))}
+        {/* Карточка товара */}
+        <div className="overflow-hidden rounded-2xl bg-card shadow-2xl">
+          {/* Header */}
+          <div className="relative flex flex-col items-center bg-gradient-to-br from-gray-800 to-gray-900 px-6 pb-6 pt-12">
+            <img
+              src={product.image}
+              alt={product.name}
+              className="h-24 w-24 object-contain"
+            />
+            {product.badge && (
+              <div className="mt-4">
+                <Badge className="bg-gradient-to-r from-primary to-purple-600 text-white shadow-lg text-sm px-4 py-1">
+                  {product.badge}
+                </Badge>
               </div>
             )}
           </div>
 
-          {/* Информация */}
-          <div>
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              {product.is_featured && (
-                <Badge className="bg-primary text-primary-foreground">Хит продаж</Badge>
-              )}
-              {product.seller_verified && (
-                <Badge variant="success">
-                  <CheckCircle className="mr-1 h-3 w-3" />
-                  Проверенный продавец
-                </Badge>
-              )}
-              {product.region && (
-                <Badge variant="secondary">
-                  <MapPin className="mr-1 h-3 w-3" />
-                  {product.region}
-                </Badge>
-              )}
-            </div>
+          {/* Content */}
+          <div className="p-6">
+            <span className="text-xs font-medium text-primary uppercase tracking-wider">
+              {product.category}
+            </span>
+            <h1 className="mt-1 text-2xl font-bold">{product.name}</h1>
 
-            <h1 className="mb-2 text-3xl font-bold">{product.name}</h1>
-
-            {product.seller_name && (
-              <p className="mb-4 text-sm text-muted-foreground">
-                Продавец: {product.seller_name}
-              </p>
-            )}
-
-            {/* Рейтинг */}
             {product.rating && (
-              <div className="mb-4 flex items-center gap-2">
-                <div className="flex items-center">
-                  <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
-                  <span className="ml-1 font-semibold">{Number(product.rating || 0).toFixed(1)}</span>
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  ({product.review_count || 0} отзывов)
-                </span>
+              <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+                <span>{product.rating}</span>
+                {product.sales && (
+                  <span>· {product.sales.toLocaleString("ru-RU")} продаж</span>
+                )}
               </div>
             )}
 
-            <p className="mb-6 text-base text-muted-foreground leading-relaxed">
+            <p className="mt-4 text-sm text-muted-foreground leading-relaxed">
               {product.description}
             </p>
 
-            {/* Характеристики */}
-            <div className="mb-6 space-y-3">
-              {product.delivery_time && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="h-4 w-4 text-primary" />
-                  <span className="text-muted-foreground">Время доставки:</span>
-                  <span className="font-medium">{product.delivery_time}</span>
-                </div>
-              )}
-              {product.stock !== null && product.stock !== undefined && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Package className="h-4 w-4 text-primary" />
-                  <span className="text-muted-foreground">В наличии:</span>
-                  <span className="font-medium">{product.stock > 0 ? `${product.stock} шт.` : "Под заказ"}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2 text-sm">
-                <Shield className="h-4 w-4 text-primary" />
-                <span className="text-muted-foreground">Гарантия:</span>
-                <span className="font-medium">Возврат в течение 24 часов</span>
-              </div>
+            {/* Price */}
+            <div className="mt-6 flex items-baseline gap-2">
+              <span className="text-4xl font-bold">{product.price.toLocaleString("ru-RU")}</span>
+              <span className="text-lg text-muted-foreground">₽</span>
             </div>
 
-            <Separator className="mb-6" />
+            {/* Payment methods */}
+            <div className="mt-8 space-y-3">
+              <p className="text-sm font-medium text-muted-foreground">Выберите способ оплаты:</p>
 
-            {/* Цена (с учётом выбранного варианта) */}
-            <div className="mb-6">
-              <div className="flex items-baseline gap-3">
-                <span className="text-4xl font-bold">{formatPrice(currentPrice)}</span>
-                {currentOldPrice && currentOldPrice > currentPrice && (
-                  <span className="text-xl text-muted-foreground line-through">
-                    {formatPrice(currentOldPrice)}
-                  </span>
+              <Button
+                size="lg"
+                className="w-full gap-3 bg-[#21A038] text-white hover:bg-[#1a8a2e] shadow-lg text-base h-14"
+                disabled={isProcessing}
+                onClick={() => handlePayment("sberpay")}
+              >
+                {isProcessing && paymentMethod === "sberpay" ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Building2 className="h-6 w-6" />
                 )}
-                {currentOldPrice && currentOldPrice > currentPrice && (
-                  <Badge className="bg-red-500 text-white">
-                    -{Math.round((1 - currentPrice / currentOldPrice) * 100)}%
-                  </Badge>
+                <span className="flex flex-col items-start leading-tight">
+                  <span>SberPay</span>
+                  <span className="text-[11px] opacity-75">Оплата через СберБанк</span>
+                </span>
+              </Button>
+
+              <Button
+                size="lg"
+                className="w-full gap-3 bg-[#007AFF] text-white hover:bg-[#0066d6] shadow-lg text-base h-14"
+                disabled={isProcessing}
+                onClick={() => handlePayment("sbp")}
+              >
+                {isProcessing && paymentMethod === "sbp" ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Smartphone className="h-6 w-6" />
                 )}
-              </div>
+                <span className="flex flex-col items-start leading-tight">
+                  <span>СБП</span>
+                  <span className="text-[11px] opacity-75">Система быстрых платежей</span>
+                </span>
+              </Button>
+
+              <Button
+                size="lg"
+                className="w-full gap-3 bg-gray-900 text-white hover:bg-gray-800 shadow-lg text-base h-14 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                disabled={isProcessing}
+                onClick={() => handlePayment("card")}
+              >
+                {isProcessing && paymentMethod === "card" ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <CreditCard className="h-6 w-6" />
+                )}
+                <span className="flex flex-col items-start leading-tight">
+                  <span>Банковская карта</span>
+                  <span className="text-[11px] opacity-75">Visa, Mastercard, МИР</span>
+                </span>
+              </Button>
             </div>
 
-            {/* Выбор варианта */}
-            {variants.length > 0 && (
-              <VariantSelector
-                variants={variants}
-                selectedId={selectedVariant?.id || null}
-                onSelect={setSelectedVariant}
-                formatPrice={formatPrice}
-              />
-            )}
-
-            {/* Для обычных товаров — количество и кнопки */}
-            {!product.provider_code ? (
-              <>
-              <div className="mb-6 flex items-center gap-4">
-                <span className="text-sm font-medium">Количество:</span>
-                <div className="flex items-center rounded-lg border">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="flex h-10 w-10 items-center justify-center text-lg hover:bg-secondary transition-colors"
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <span className="flex h-10 w-14 items-center justify-center border-x text-sm font-medium">
-                    {quantity}
-                  </span>
-                  <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="flex h-10 w-10 items-center justify-center text-lg hover:bg-secondary transition-colors"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button size="lg" className="gap-2 flex-1 sm:flex-none" onClick={handleBuyNow}>
-                  <Zap className="h-5 w-5" />
-                  Купить сейчас
-                </Button>
-                <Button
-                  variant={addedToCart ? "default" : "outline"}
-                  size="lg"
-                  className={cn("flex-1 sm:flex-none gap-2", addedToCart && "bg-emerald-600 hover:bg-emerald-700")}
-                  onClick={handleAddToCart}
-                >
-                  <ShoppingCart className="h-5 w-5" />
-                  {addedToCart ? "Добавлено!" : "В корзину"}
-                </Button>
-              </div>
-
-              {/* Быстрая оплата — всегда видна */}
-              {payError && (
-                <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-600">{payError}</div>
-              )}
-              <div className="mt-4 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">
-                  {user ? "Быстрая оплата:" : "Оплатить без регистрации:"}
-                </p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  <SberPayButton
-                    selected={false}
-                    onClick={() => handleDirectPayment("sberpay")}
-                  />
-                  <button
-                    onClick={() => handleDirectPayment("sbp")}
-                    disabled={processing !== null}
-                    className="flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-all hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
-                  >
-                    {processing === "sbp" ? (
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                    ) : (
-                      <><span className="text-lg">📱</span> СБП</>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleDirectPayment("card")}
-                    disabled={processing !== null}
-                    className="flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-all hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
-                  >
-                    {processing === "card" ? (
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                    ) : (
-                      <><span className="text-lg">💳</span> Карта</>
-                    )}
-                  </button>
-                </div>
-              </div>
-              </>
-            ) : (
-              <div className="border rounded-xl p-5 bg-card">
-                <h3 className="font-semibold mb-4">Пополнение услуги</h3>
-                <ServiceForm
-                  product={{
-                    id: product.id,
-                    name: product.name,
-                    price: product.price,
-                    provider_code: product.provider_code || "",
-                    provider_service_id: product.provider_service_id || "",
-                  }}
-                />
+            {/* Error */}
+            {error && (
+              <div className="mt-4 p-4 bg-red-900/30 border border-red-500/30 rounded-xl text-sm text-red-300">
+                {error}
               </div>
             )}
 
-            {/* Безопасность */}
-            <div className="mt-6 flex items-center gap-4 rounded-lg bg-primary/5 p-3 text-xs text-muted-foreground">
-              <Shield className="h-4 w-4 text-primary shrink-0" />
-              <span>Безопасная оплата. Гарантия возврата в течение 24 часов.</span>
+            {/* Security */}
+            <div className="mt-8 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <Shield className="h-4 w-4" />
+              Безопасный платёж · Мгновенная доставка · 100% гарантия
             </div>
           </div>
         </div>
-
-        {/* Табы: Описание, Отзывы, FAQ */}
-        <div className="mt-12">
-          <Tabs defaultValue="description" className="w-full">
-            <TabsList className="w-full justify-start border-b rounded-none bg-transparent p-0 h-auto">
-              <TabsTrigger
-                value="description"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3"
-              >
-                <Info className="mr-2 h-4 w-4" />
-                Описание
-              </TabsTrigger>
-              <TabsTrigger
-                value="reviews"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3"
-              >
-                <MessageCircle className="mr-2 h-4 w-4" />
-                Отзывы ({product.review_count || 0})
-              </TabsTrigger>
-              <TabsTrigger
-                value="faq"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3"
-              >
-                <HelpCircle className="mr-2 h-4 w-4" />
-                FAQ ({faq.length})
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="description" className="pt-6">
-              <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-                <div className="lg:col-span-2">
-                  <h3 className="mb-4 text-lg font-semibold">Подробное описание</h3>
-                  <div className="prose prose-sm max-w-none text-muted-foreground leading-relaxed">
-                    <p>{product.description}</p>
-                  </div>
-                </div>
-                <div>
-                  {features.length > 0 && (
-                    <div className="rounded-xl border bg-card p-6">
-                      <h3 className="mb-4 text-lg font-semibold">Что вы получите</h3>
-                      <ul className="space-y-3">
-                        {features.map((feature, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                            <span className="text-sm">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="reviews" className="pt-6">
-              {reviews.length > 0 ? (
-                <div className="space-y-4">
-                  {reviews.map((review, idx) => (
-                    <div key={idx} className="rounded-xl border bg-card p-6">
-                      <div className="mb-2 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
-                            {review.author[0]}
-                          </div>
-                          <span className="font-medium">{review.author}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <Star
-                              key={i}
-                              className={cn(
-                                "h-4 w-4",
-                                i < review.rating ? "fill-amber-400 text-amber-400" : "text-gray-300"
-                              )}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{review.text}</p>
-                      <p className="mt-2 text-xs text-muted-foreground">{review.date}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-xl border bg-card p-12 text-center">
-                  <MessageCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                  <h3 className="mb-2 text-lg font-semibold">Пока нет отзывов</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Будьте первым, кто оставит отзыв о товаре
-                  </p>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="faq" className="pt-6">
-              {faq.length > 0 ? (
-                <div className="space-y-2">
-                  {faq.map((item, idx) => (
-                    <details key={idx} className="group rounded-xl border bg-card overflow-hidden">
-                      <summary className="flex cursor-pointer items-center justify-between px-6 py-4 text-sm font-medium hover:bg-secondary/50 transition-colors">
-                        <span>{item.question}</span>
-                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-                      </summary>
-                      <div className="border-t px-6 py-4 text-sm text-muted-foreground leading-relaxed">
-                        {item.answer}
-                      </div>
-                    </details>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-xl border bg-card p-12 text-center">
-                  <HelpCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                  <h3 className="mb-2 text-lg font-semibold">Нет вопросов</h3>
-                  <p className="text-sm text-muted-foreground">
-                    По этому товару пока нет часто задаваемых вопросов
-                  </p>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
       </div>
-
-      <TrustBlock />
     </div>
   )
 }

@@ -40,7 +40,7 @@ export default function About() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="mb-6 text-4xl font-bold text-white sm:text-5xl">
-              О платформе <span className="text-primary">Козагога</span>
+              О платформе <span className="text-primary">ciframall</span>
             </h1>
             <p className="text-lg text-gray-400">
               Мы делаем покупку цифровых товаров быстрой, безопасной и удобной.
@@ -78,7 +78,7 @@ export default function About() {
           <div className="mb-12 text-center">
             <h2 className="text-3xl font-bold">Наши ценности</h2>
             <p className="mt-2 text-muted-foreground">
-              Четыре принципа, на которых построена Козагога
+              Четыре принципа, на которых построена ciframall
             </p>
           </div>
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">

@@ -20,6 +20,7 @@ import WalletPage from './pages/Wallet'
 import TicketList from './pages/TicketList'
 import TicketForm from './pages/TicketForm'
 import TicketDetail from './pages/TicketDetail'
+import CifraMallPreview from './pages/CifraMallPreview'
 import NotFound from './pages/NotFound'
 import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute'
 
@@ -78,6 +79,7 @@ export const router = createBrowserRouter([
         path: 'admin',
         element: <AdminRoute><AdminDashboard /></AdminRoute>,
       },
+      { path: 'ciframall', element: <CifraMallPreview /> },
       { path: '*', element: <NotFound /> },
     ],
   },

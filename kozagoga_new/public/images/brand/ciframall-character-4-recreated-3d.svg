@@ -1,0 +1,256 @@
+<svg width="1200" height="800" viewBox="0 0 1200 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 3D Body Gradient: light from top-left creates volumetric feel -->
+    <radialGradient id="bodyVol" cx="380" cy="280" r="540" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.30" stop-color="#FFFFFF"/>
+      <stop offset="0.55" stop-color="#F6F7FB"/>
+      <stop offset="0.78" stop-color="#E8EAF2"/>
+      <stop offset="0.92" stop-color="#D8DBE6"/>
+      <stop offset="1" stop-color="#CCD0DC"/>
+    </radialGradient>
+    
+    <!-- 3D Highlight: glossy top-left reflection -->
+    <radialGradient id="bodyGloss" cx="320" cy="200" r="360" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.85"/>
+      <stop offset="0.35" stop-color="#FFFFFF" stop-opacity="0.35"/>
+      <stop offset="0.65" stop-color="#FFFFFF" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- 3D Bottom Shadow on body -->
+    <radialGradient id="bodyShadow" cx="430" cy="620" r="280" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#B0B5C5" stop-opacity="0.40"/>
+      <stop offset="0.50" stop-color="#C5C9D6" stop-opacity="0.15"/>
+      <stop offset="1" stop-color="#E8EAF2" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- 3D Edge rim light -->
+    <linearGradient id="rimLight" x1="120" y1="150" x2="860" y2="650" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.20" stop-color="#FFFFFF" stop-opacity="0.92"/>
+      <stop offset="0.50" stop-color="#FFFFFF" stop-opacity="0.72"/>
+      <stop offset="0.80" stop-color="#EFF1F6" stop-opacity="0.54"/>
+      <stop offset="1" stop-color="#D6D9E4" stop-opacity="0.38"/>
+    </linearGradient>
+
+    <!-- Purple Cart Base -->
+    <linearGradient id="cartVol" x1="820" y1="380" x2="1080" y2="620" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#C084FC"/>
+      <stop offset="0.18" stop-color="#A855F7"/>
+      <stop offset="0.48" stop-color="#7C3AED"/>
+      <stop offset="0.78" stop-color="#5B21B6"/>
+      <stop offset="1" stop-color="#3B0764"/>
+    </linearGradient>
+    
+    <!-- Cart Front Face -->
+    <linearGradient id="cartFront" x1="850" y1="440" x2="1060" y2="580" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9333EA"/>
+      <stop offset="0.40" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#4C1D95"/>
+    </linearGradient>
+    
+    <!-- Cart Highlight -->
+    <linearGradient id="cartHighlight" x1="820" y1="390" x2="960" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E9D5FF" stop-opacity="0.80"/>
+      <stop offset="0.50" stop-color="#D8B4FE" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#A855F7" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Media Card Gradients -->
+    <linearGradient id="card1" x1="880" y1="240" x2="1000" y2="390" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#D8B4FE"/>
+      <stop offset="0.40" stop-color="#A855F7"/>
+      <stop offset="1" stop-color="#6D28D9"/>
+    </linearGradient>
+    <linearGradient id="card2" x1="960" y1="280" x2="1060" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A855F7"/>
+      <stop offset="0.50" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#3B0764"/>
+    </linearGradient>
+
+    <!-- Drop Shadow for entire character -->
+    <filter id="charShadow" x="-60" y="-60" width="1320" height="920" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="40" stdDeviation="35" flood-color="#000000" flood-opacity="0.30"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="60" flood-color="#7C3AED" flood-opacity="0.12"/>
+    </filter>
+
+    <!-- Cart Shadow -->
+    <filter id="cartShadow" x="700" y="300" width="460" height="460" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="-8" dy="18" stdDeviation="16" flood-color="#1E0A3C" flood-opacity="0.40"/>
+    </filter>
+
+    <!-- Eye glass/reflect -->
+    <radialGradient id="eyeInner" cx="0.42" cy="0.35" r="0.65">
+      <stop offset="0" stop-color="#2D3748"/>
+      <stop offset="0.55" stop-color="#05070D"/>
+      <stop offset="1" stop-color="#03050A"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Floor glow -->
+  <ellipse cx="550" cy="710" rx="460" ry="60" fill="#7C3AED" opacity="0.12"/>
+  <ellipse cx="540" cy="720" rx="380" ry="22" fill="#FFFFFF" opacity="0.10"/>
+
+  <g filter="url(#charShadow)">
+    <!-- ==== ANTENNAS ==== -->
+    <!-- Left Antenna -->
+    <path d="M312 292C294 202 270 130 216 72" stroke="url(#rimLight)" stroke-width="24" stroke-linecap="round"/>
+    <path d="M312 292C298 218 278 148 233 90" stroke="#D6D9E4" stroke-width="5" stroke-linecap="round" opacity="0.60"/>
+    <circle cx="204" cy="62" r="40" fill="url(#bodyVol)"/>
+    <circle cx="204" cy="62" r="40" stroke="#FFFFFF" stroke-width="5"/>
+    <circle cx="194" cy="52" r="12" fill="#FFFFFF" opacity="0.70"/>
+    
+    <!-- Right Antenna -->
+    <path d="M545 288C560 196 574 122 628 64" stroke="url(#rimLight)" stroke-width="24" stroke-linecap="round"/>
+    <path d="M545 288C558 212 570 140 616 84" stroke="#D6D9E4" stroke-width="5" stroke-linecap="round" opacity="0.60"/>
+    <circle cx="640" cy="54" r="40" fill="url(#bodyVol)"/>
+    <circle cx="640" cy="54" r="40" stroke="#FFFFFF" stroke-width="5"/>
+    <circle cx="630" cy="44" r="12" fill="#FFFFFF" opacity="0.70"/>
+
+    <!-- ==== LEFT SIDE BULB/EAR ==== -->
+    <!-- White outer casing of left side module -->
+    <ellipse cx="108" cy="470" rx="48" ry="90" fill="url(#bodyVol)"/>
+    <ellipse cx="108" cy="470" rx="48" ry="90" stroke="#FFFFFF" stroke-width="6"/>
+    <ellipse cx="108" cy="470" rx="48" ry="90" fill="url(#bodyGloss)" opacity="0.5"/>
+    
+    <!-- Black inner part of left module -->
+    <ellipse cx="118" cy="470" rx="26" ry="64" fill="#05070D"/>
+    <ellipse cx="130" cy="455" rx="10" ry="16" fill="#FFFFFF" opacity="0.10"/>
+    <circle cx="95" cy="550" r="14" fill="#FFFFFF" stroke="#03050B" stroke-width="4"/>
+
+    <!-- ==== MAIN BODY: egg/oval shape from concept #4 ==== -->
+    <!-- Base body volume -->
+    <path d="M430 104C278 104 162 194 148 352C134 510 230 672 430 672C628 672 722 510 708 352C694 194 580 104 430 104Z" fill="url(#bodyVol)"/>
+    
+    <!-- Body stroke for crisp edge -->
+    <path d="M430 104C278 104 162 194 148 352C134 510 230 672 430 672C628 672 722 510 708 352C694 194 580 104 430 104Z" stroke="url(#rimLight)" stroke-width="14"/>
+    
+    <!-- 3D glossy highlight on top-left -->
+    <path d="M430 104C278 104 162 194 148 352C144 400 148 444 158 484C170 440 194 394 230 362C280 316 350 290 430 290C510 290 574 314 618 356C650 386 670 426 678 468C686 424 688 384 684 348C670 206 566 104 430 104Z" fill="url(#bodyGloss)"/>
+    
+    <!-- Volume shadow at bottom -->
+    <path d="M220 560C260 640 342 672 430 672C518 672 600 640 640 560L430 560Z" fill="url(#bodyShadow)"/>
+
+    <!-- Subtle ridge lines at body edges for 3D depth -->
+    <path d="M168 372C168 372 162 400 166 430" stroke="#D0D4E0" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+    <path d="M694 370C694 370 700 400 696 430" stroke="#D0D4E0" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+
+    <!-- ==== EYES: large glossy black ovals ==== -->
+    <!-- Left Eye -->
+    <g>
+      <ellipse cx="340" cy="386" rx="62" ry="68" fill="url(#eyeInner)"/>
+      <ellipse cx="340" cy="386" rx="62" ry="68" stroke="#FFFFFF" stroke-width="12"/>
+      <!-- Main highlight -->
+      <ellipse cx="320" cy="364" rx="22" ry="26" fill="#FFFFFF"/>
+      <!-- Secondary sparkle -->
+      <circle cx="362" cy="348" r="10" fill="#FFFFFF" opacity="0.90"/>
+      <!-- Soft reflection arc -->
+      <path d="M290 414C308 436 360 438 380 412" stroke="#1A202C" stroke-width="5" opacity="0.40"/>
+    </g>
+
+    <!-- Right Eye -->
+    <g>
+      <ellipse cx="518" cy="386" rx="62" ry="68" fill="url(#eyeInner)"/>
+      <ellipse cx="518" cy="386" rx="62" ry="68" stroke="#FFFFFF" stroke-width="12"/>
+      <ellipse cx="498" cy="364" rx="22" ry="26" fill="#FFFFFF"/>
+      <circle cx="540" cy="348" r="10" fill="#FFFFFF" opacity="0.90"/>
+      <path d="M468 414C486 436 538 438 558 412" stroke="#1A202C" stroke-width="5" opacity="0.40"/>
+    </g>
+
+    <!-- ==== SMILE ==== -->
+    <path d="M390 478C418 510 482 510 508 478" stroke="#080A10" stroke-width="11" stroke-linecap="round"/>
+    <circle cx="390" cy="478" r="6" fill="#080A10"/>
+    <circle cx="508" cy="478" r="6" fill="#080A10"/>
+
+    <!-- ==== LEFT ARM (short, connecting to side module) ==== -->
+    <path d="M158 462C132 470 116 478 118 498" stroke="url(#rimLight)" stroke-width="28" stroke-linecap="round"/>
+    <path d="M158 462C132 470 116 478 118 498" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+
+    <!-- ==== RIGHT ARM (reaching to cart handle) ==== -->
+    <path d="M704 458C746 444 770 442 796 452" stroke="url(#rimLight)" stroke-width="30" stroke-linecap="round"/>
+    <path d="M704 458C740 446 766 444 792 454" stroke="#D6D9E4" stroke-width="7" stroke-linecap="round" opacity="0.55"/>
+    <circle cx="800" cy="454" r="20" fill="#FFFFFF" stroke="#DEE1EA" stroke-width="7"/>
+    <circle cx="800" cy="454" r="7" fill="#C5C9D6" opacity="0.6"/>
+
+    <!-- ==== FEET/WHEELS ==== -->
+    <!-- Left Foot -->
+    <g>
+      <path d="M296 614C304 572 346 558 380 582C408 600 412 644 394 680C378 712 332 714 314 686C304 668 292 648 296 614Z" fill="#FFFFFF"/>
+      <ellipse cx="350" cy="650" rx="36" ry="62" fill="#05070D"/>
+      <ellipse cx="350" cy="650" rx="36" ry="62" stroke="#FFFFFF" stroke-width="8"/>
+      <path d="M332 608C348 592 374 602 384 626" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" opacity="0.85"/>
+      <path d="M332 662H364" stroke="#2D3748" stroke-width="5" stroke-linecap="round" opacity="0.60"/>
+    </g>
+    
+    <!-- Right Foot -->
+    <g>
+      <path d="M558 614C566 572 610 558 644 582C672 600 676 644 658 680C642 712 596 714 578 686C568 668 556 648 558 614Z" fill="#FFFFFF"/>
+      <ellipse cx="614" cy="650" rx="36" ry="62" fill="#05070D"/>
+      <ellipse cx="614" cy="650" rx="36" ry="62" stroke="#FFFFFF" stroke-width="8"/>
+      <path d="M596 608C612 592 638 602 648 626" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" opacity="0.85"/>
+      <path d="M596 662H628" stroke="#2D3748" stroke-width="5" stroke-linecap="round" opacity="0.60"/>
+    </g>
+  </g>
+
+  <!-- ==== SHOPPING CART (purple, sits in front on right) ==== -->
+  <g filter="url(#cartShadow)">
+    <!-- Media Cards inside cart -->
+    <g transform="translate(864 262) rotate(-6)">
+      <rect x="0" y="0" width="118" height="148" rx="20" fill="url(#card1)" stroke="#D8B4FE" stroke-width="8"/>
+      <path d="M50 42V96" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+      <path d="M50 42L90 30V62L50 72" stroke="#FFFFFF" stroke-width="16" stroke-linejoin="round"/>
+      <ellipse cx="28" cy="100" rx="18" ry="16" fill="#FFFFFF"/>
+      <path d="M12 120H108" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" opacity="0.30"/>
+    </g>
+    <g transform="translate(968 296) rotate(8)">
+      <rect x="0" y="0" width="108" height="136" rx="18" fill="url(#card2)" stroke="#B983FF" stroke-width="8"/>
+      <path d="M40 38L40 88L82 63L40 38Z" fill="#FFFFFF"/>
+      <path d="M20 108H90" stroke="#D8B4FE" stroke-width="6" stroke-linecap="round" opacity="0.50"/>
+      <circle cx="84" cy="114" r="10" fill="#A855F7" opacity="0.60"/>
+    </g>
+
+    <!-- Cart Handle -->
+    <path d="M810 440C838 422 870 416 898 432" stroke="#7C3AED" stroke-width="22" stroke-linecap="round"/>
+    <path d="M814 440C838 424 866 420 892 434" stroke="#D8B4FE" stroke-width="7" stroke-linecap="round" opacity="0.50"/>
+
+    <!-- Cart Basket Body -->
+    <path d="M858 450L851 466L870 612H1072L1090 466L1084 450Z" fill="url(#cartVol)"/>
+    <path d="M858 450L851 466L870 612H1072L1090 466L1084 450Z" stroke="#C084FC" stroke-width="8" stroke-linejoin="round"/>
+    
+    <!-- Cart Front Face (3D depth) -->
+    <path d="M866 470L884 508L876 612H1072L1090 466L1084 450L974 450Z" fill="url(#cartFront)" opacity="0.60"/>
+    
+    <!-- Cart Top Rim Highlight -->
+    <path d="M862 448L854 464" stroke="#E9D5FF" stroke-width="8" stroke-linecap="round"/>
+    <path d="M1084 448L1094 464" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" opacity="0.40"/>
+
+    <!-- Cart Glossy Reflection -->
+    <path d="M872 470L858 466L868 610L918 610L906 470Z" fill="url(#cartHighlight)"/>
+
+    <!-- Cart divider lines (horizontal) -->
+    <path d="M874 490H1080" stroke="#D8B4FE" stroke-width="6" stroke-linecap="round" opacity="0.25"/>
+    <path d="M878 530H1076" stroke="#C084FC" stroke-width="6" stroke-linecap="round" opacity="0.30"/>
+    <path d="M876 570H1074" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" opacity="0.85"/>
+
+    <!-- Cart side edge lines for depth -->
+    <path d="M868 460L874 608" stroke="#C084FC" stroke-width="5" opacity="0.45"/>
+    <path d="M1076 460L1070 608" stroke="#2E1065" stroke-width="8" opacity="0.50"/>
+
+    <!-- Cart Undercarriage -->
+    <path d="M876 636H1068" stroke="#5B21B6" stroke-width="18" stroke-linecap="round"/>
+    <path d="M906 612L890 640" stroke="#6D28D9" stroke-width="14" stroke-linecap="round"/>
+    <path d="M1040 612L1056 640" stroke="#6D28D9" stroke-width="14" stroke-linecap="round"/>
+
+    <!-- Cart Wheels -->
+    <circle cx="912" cy="668" r="34" fill="#5B21B6"/>
+    <circle cx="912" cy="668" r="34" stroke="#C084FC" stroke-width="4"/>
+    <circle cx="912" cy="668" r="15" fill="#D8B4FE" opacity="0.90"/>
+    <circle cx="912" cy="668" r="6" fill="#FFFFFF" opacity="0.30"/>
+
+    <circle cx="1050" cy="668" r="34" fill="#5B21B6"/>
+    <circle cx="1050" cy="668" r="34" stroke="#C084FC" stroke-width="4"/>
+    <circle cx="1050" cy="668" r="15" fill="#D8B4FE" opacity="0.90"/>
+    <circle cx="1050" cy="668" r="6" fill="#FFFFFF" opacity="0.30"/>
+  </g>
+</svg>

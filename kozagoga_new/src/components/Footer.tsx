@@ -43,7 +43,7 @@ export default function Footer() {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 font-bold text-white text-sm shadow-sm">
                 К
               </div>
-              <span className="text-xl font-bold">Козагога</span>
+              <span className="text-xl font-bold">ciframall</span>
             </Link>
             <p className="mb-6 text-sm text-gray-400 max-w-sm">
               Маркетплейс цифровых товаров. Игры, пополнения кошельков, подарочные карты, подписки и многое другое. Мгновенная доставка, безопасные платежи, лучшие цены.
@@ -53,8 +53,8 @@ export default function Footer() {
             <div className="space-y-2 text-sm text-gray-400">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-primary" />
-                <a href="mailto:support@kozagogo.ru" className="hover:text-primary transition-colors">
-                  support@kozagogo.ru
+                <a href="mailto:support@ciframall.net" className="hover:text-primary transition-colors">
+                  support@ciframall.net
                 </a>
               </div>
               <div className="flex items-center gap-2">
@@ -124,7 +124,7 @@ export default function Footer() {
               </div>
             </div>
             <p className="text-xs text-gray-600">
-              © {new Date().getFullYear()} Козагога. Все права защищены.
+              © {new Date().getFullYear()} ciframall. Все права защищены.
             </p>
           </div>
         </div>

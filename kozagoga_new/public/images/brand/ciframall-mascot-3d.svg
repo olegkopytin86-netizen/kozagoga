@@ -1,0 +1,129 @@
+<svg width="900" height="650" viewBox="0 0 900 650" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bodyWhite" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(305 245) rotate(55) scale(285 330)">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.52" stop-color="#FFFFFF"/>
+      <stop offset="0.78" stop-color="#F7F7FB"/>
+      <stop offset="1" stop-color="#ECECF4"/>
+    </radialGradient>
+    <linearGradient id="softWhite" x1="155" y1="70" x2="455" y2="540" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.62" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F3F3F8"/>
+    </linearGradient>
+    <linearGradient id="purpleCart" x1="540" y1="260" x2="740" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A855F7"/>
+      <stop offset="0.5" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#5B21B6"/>
+    </linearGradient>
+    <linearGradient id="purpleLight" x1="540" y1="190" x2="770" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C084FC"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <radialGradient id="eyeGloss" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(0 0) rotate(45) scale(72)">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.22" stop-color="#FFFFFF"/>
+      <stop offset="0.25" stop-color="#111827"/>
+      <stop offset="1" stop-color="#030712"/>
+    </radialGradient>
+    <filter id="shadow" x="0" y="0" width="900" height="650" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="34" stdDeviation="28" flood-color="#000000" flood-opacity="0.28"/>
+      <feDropShadow dx="0" dy="10" stdDeviation="22" flood-color="#7C3AED" flood-opacity="0.18"/>
+    </filter>
+    <filter id="cartShadow" x="420" y="190" width="410" height="390" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#3B0764" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- floor glow -->
+  <ellipse cx="392" cy="548" rx="350" ry="54" fill="url(#purpleLight)" opacity="0.16"/>
+  <ellipse cx="390" cy="552" rx="292" ry="26" fill="#FFFFFF" opacity="0.16"/>
+
+  <g filter="url(#shadow)">
+    <!-- antennas -->
+    <path d="M260 117C246 75 229 48 207 29" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+    <path d="M260 117C246 75 229 48 207 29" stroke="#E9E9F1" stroke-width="5" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="199" cy="23" r="25" fill="#FFFFFF"/>
+    <circle cx="199" cy="23" r="25" stroke="#EFEFF6" stroke-width="4"/>
+    <path d="M367 113C379 70 394 43 416 24" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+    <path d="M367 113C379 70 394 43 416 24" stroke="#E9E9F1" stroke-width="5" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="425" cy="18" r="25" fill="#FFFFFF"/>
+    <circle cx="425" cy="18" r="25" stroke="#EFEFF6" stroke-width="4"/>
+
+    <!-- left small arm -->
+    <path d="M151 329C96 341 69 385 77 430" stroke="#FFFFFF" stroke-width="40" stroke-linecap="round"/>
+    <path d="M80 430C83 456 102 476 126 485" stroke="#FFFFFF" stroke-width="31" stroke-linecap="round"/>
+    <path d="M96 388C85 411 88 446 119 470" stroke="#ECECF4" stroke-width="9" stroke-linecap="round" opacity="0.8"/>
+
+    <!-- body -->
+    <path d="M322 88C231 88 158 162 158 255V373C158 466 231 540 322 540C413 540 486 466 486 373V255C486 162 413 88 322 88Z" fill="url(#bodyWhite)"/>
+    <path d="M322 88C231 88 158 162 158 255V373C158 466 231 540 322 540C413 540 486 466 486 373V255C486 162 413 88 322 88Z" stroke="#FFFFFF" stroke-width="10"/>
+    <path d="M206 190C224 135 270 113 320 110" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round" opacity="0.82"/>
+    <path d="M183 383C193 457 248 504 327 509" stroke="#F4F4FA" stroke-width="18" stroke-linecap="round" opacity="0.72"/>
+    <path d="M432 167C465 214 471 287 466 345" stroke="#EAEAEE" stroke-width="13" stroke-linecap="round" opacity="0.56"/>
+
+    <!-- right arm holding cart -->
+    <path d="M471 329C505 316 532 331 553 360" stroke="#FFFFFF" stroke-width="34" stroke-linecap="round"/>
+    <path d="M480 330C510 326 530 340 548 361" stroke="#ECECF4" stroke-width="8" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="557" cy="364" r="22" fill="#FFFFFF"/>
+    <circle cx="557" cy="364" r="22" stroke="#EEEFF6" stroke-width="5"/>
+
+    <!-- side details, still white casing with black inserts -->
+    <ellipse cx="164" cy="337" rx="35" ry="72" fill="#FFFFFF"/>
+    <ellipse cx="164" cy="337" rx="35" ry="72" stroke="#EFEFF6" stroke-width="8"/>
+    <ellipse cx="166" cy="337" rx="18" ry="47" fill="#05070C"/>
+    <path d="M150 303C158 284 170 277 184 281" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+
+    <!-- eyes -->
+    <ellipse cx="267" cy="264" rx="54" ry="67" fill="#05070C"/>
+    <ellipse cx="267" cy="264" rx="54" ry="67" stroke="#FFFFFF" stroke-width="10"/>
+    <circle cx="248" cy="238" r="17" fill="#FFFFFF"/>
+    <circle cx="278" cy="224" r="8" fill="#FFFFFF" opacity="0.85"/>
+
+    <ellipse cx="379" cy="264" rx="54" ry="67" fill="#05070C"/>
+    <ellipse cx="379" cy="264" rx="54" ry="67" stroke="#FFFFFF" stroke-width="10"/>
+    <circle cx="360" cy="238" r="17" fill="#FFFFFF"/>
+    <circle cx="390" cy="224" r="8" fill="#FFFFFF" opacity="0.85"/>
+
+    <!-- smile -->
+    <path d="M288 356C309 382 344 382 365 356" stroke="#111827" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="287" cy="354" r="6" fill="#111827"/>
+    <circle cx="366" cy="354" r="6" fill="#111827"/>
+
+    <!-- wheels / feet -->
+    <g>
+      <ellipse cx="230" cy="506" rx="36" ry="58" fill="#05070C"/>
+      <ellipse cx="230" cy="506" rx="36" ry="58" stroke="#FFFFFF" stroke-width="8"/>
+      <path d="M214 472C229 459 248 465 256 485" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" opacity="0.82"/>
+    </g>
+    <g>
+      <ellipse cx="410" cy="506" rx="36" ry="58" fill="#05070C"/>
+      <ellipse cx="410" cy="506" rx="36" ry="58" stroke="#FFFFFF" stroke-width="8"/>
+      <path d="M394 472C409 459 428 465 436 485" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" opacity="0.82"/>
+    </g>
+  </g>
+
+  <!-- purple shopping cart -->
+  <g filter="url(#cartShadow)">
+    <path d="M540 315H783L744 466H577L540 315Z" fill="url(#purpleCart)"/>
+    <path d="M540 315H783L744 466H577L540 315Z" stroke="#C084FC" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M522 286C543 284 557 298 562 319" stroke="#7C3AED" stroke-width="18" stroke-linecap="round"/>
+    <path d="M589 483H741" stroke="#7C3AED" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="604" cy="516" r="28" fill="#7C3AED"/>
+    <circle cx="604" cy="516" r="13" fill="#C084FC" opacity="0.85"/>
+    <circle cx="728" cy="516" r="28" fill="#7C3AED"/>
+    <circle cx="728" cy="516" r="13" fill="#C084FC" opacity="0.85"/>
+
+    <!-- digital cards -->
+    <rect x="606" y="190" width="96" height="124" rx="18" fill="#8B5CF6" stroke="#C084FC" stroke-width="7"/>
+    <path d="M648 232V274" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+    <path d="M648 232L681 223V247L648 256" stroke="#FFFFFF" stroke-width="14" stroke-linejoin="round"/>
+    <circle cx="630" cy="279" r="15" fill="#FFFFFF"/>
+
+    <rect x="719" y="224" width="90" height="111" rx="18" fill="#6D28D9" stroke="#B983FF" stroke-width="7"/>
+    <path d="M754 260L754 304L789 282L754 260Z" fill="#FFFFFF"/>
+
+    <path d="M577 355H749" stroke="#C084FC" stroke-width="7" stroke-linecap="round" opacity="0.5"/>
+    <path d="M593 424H729" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" opacity="0.86"/>
+  </g>
+</svg>

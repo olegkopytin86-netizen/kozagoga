@@ -81,7 +81,7 @@ export default function AdminDashboard() {
               Админ-панель
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Управление магазином Козагога
+              Управление магазином ciframall
             </p>
           </div>
           <Link to="/dashboard">

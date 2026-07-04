@@ -29,7 +29,7 @@ export default function TrustBlock() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8 text-center">
           <h2 className="text-2xl font-bold text-white">
-            Почему выбирают <span className="text-primary">Козагога</span>
+            Почему выбирают <span className="text-primary">ciframall</span>
           </h2>
           <p className="mt-2 text-gray-400">
             Мы делаем покупку цифровых товаров быстрой, безопасной и удобной

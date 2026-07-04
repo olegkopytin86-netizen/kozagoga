@@ -87,8 +87,8 @@ export default function Login() {
 
             <div className="rounded-lg border bg-secondary/50 p-3 text-xs text-muted-foreground">
               <p className="mb-1 font-medium text-foreground">Демо-доступ:</p>
-              <p>Админ: admin@kozagogo.ru</p>
-              <p>Пользователь: user@kozagogo.ru</p>
+              <p>Админ: admin@ciframall.net</p>
+              <p>Пользователь: user@ciframall.net</p>
               <p className="mt-1 text-foreground">Пароль уточните у администратора</p>
             </div>
           </form>
