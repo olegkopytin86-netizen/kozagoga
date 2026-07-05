@@ -1,36 +1,38 @@
 import { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { Search, ShoppingCart, User, Menu, X, ChevronDown, Package, Zap, Gift, CreditCard, Headphones, LogOut, Shield } from "lucide-react"
+import { Search, User, Menu, X, ChevronDown, Package, Headphones, LogOut, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/AuthContext"
-import { useCart } from "@/contexts/CartContext"
 import { db } from "@/lib/api"
 import { defaultCategories } from "@/lib/categories"
 import type { Category } from "@/types/database"
 
 export default function Header() {
   const { user, isAdmin, logout } = useAuth()
-  const { itemCount } = useCart()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState("")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [catalogOpen, setCatalogOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
+  const [scrolled, setScrolled] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      const { data } = await db
-        .from("categories")
-        .select("*")
-        .order("sort_order", { ascending: true })
-      if (data && data.length > 0) {
-        setCategories(data)
-      }
-    }
+    const handleScroll = () => setScrolled(window.scrollY > 40)
+    window.addEventListener("scroll", handleScroll, { passive: true })
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
+
+  useEffect(() => {
     fetchCategories()
   }, [])
+
+  const fetchCategories = async () => {
+    const { data } = await db.from("categories").select("*").order("sort_order", { ascending: true })
+    if (data && data.length > 0) setCategories(data)
+  }
 
   const displayCategories = categories.length > 0 ? categories : defaultCategories
 
@@ -39,299 +41,217 @@ export default function Header() {
     if (searchQuery.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
       setMobileMenuOpen(false)
+      setSearchOpen(false)
     }
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between gap-4">
-          {/* Логотип */}
-          <Link to="/" className="flex items-center gap-2 shrink-0">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FF7A00] font-bold text-white text-sm shadow-sm">
-              К
-            </div>
-            <span className="hidden text-xl font-bold sm:block">
-              <span className="text-white">Cifra</span><span className="text-[#FF7A00] drop-shadow-[0_0_8px_rgba(255,122,0,0.3)]">Mall</span>
-            </span>
-          </Link>
+    <>
+      <header
+        className={`sticky top-0 z-50 transition-all duration-500 ${
+          scrolled
+            ? "bg-[rgba(6,11,26,0.82)] backdrop-blur-2xl shadow-[0_18px_60px_rgba(0,148,255,0.14),0_4px_30px_rgba(0,0,0,0.5)]"
+            : "bg-[rgba(6,11,26,0.55)] backdrop-blur-xl shadow-[0_14px_50px_rgba(0,148,255,0.06)]"
+        }`}
+        style={{ borderBottom: scrolled ? '1px solid rgba(0,229,255,0.16)' : '1px solid rgba(0,229,255,0.10)' }}
+      >
+        <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
+          <div className="flex h-14 sm:h-[90px] lg:h-[130px] items-center justify-between relative">
+            {/* ─── Левая часть: CifraMall logo + mascot ─── */}
+            <Link to="/" className="flex items-center gap-2 sm:gap-5 shrink-0 group">
+              <div className="flex flex-col leading-none">
+                <span className="text-xl sm:text-[32px] lg:text-[56px] font-bold tracking-tight leading-none">
+                  <span className="text-white drop-shadow-[0_0_20px_rgba(0,148,255,0.30)]">Cifra</span>
+                  <span className="text-galaxy-gradient">Mall</span>
+                </span>
+              </div>
+              {/* Mascot с galaxy glow */}
+              <div className="relative -ml-1 sm:-ml-3 mt-2 sm:mt-8 self-end">
+                <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[80px] h-[56px] sm:w-[210px] sm:h-[140px] rounded-full bg-[#0094FF]/18 blur-[46px] sm:blur-[76px] animate-glow-pulse pointer-events-none" />
+                <div className="absolute bottom-[10%] left-[62%] -translate-x-1/2 w-[54px] h-[40px] sm:w-[140px] sm:h-[96px] rounded-full bg-[#00E5FF]/10 blur-[36px] sm:blur-[64px] pointer-events-none" />
+                <img
+                  src="/images/brand/mascot-new.png"
+                  alt="CifraMall"
+                  className="relative z-10 h-10 sm:h-[70px] md:h-[100px] lg:h-[170px] xl:h-[260px] w-auto object-contain animate-float drop-shadow-[0_24px_60px_rgba(0,148,255,0.28)]"
+                />
+              </div>
+            </Link>
 
-          {/* Поиск */}
-          <form onSubmit={handleSearch} className="hidden flex-1 md:block max-w-md lg:max-w-lg">
+            {/* ─── Поиск (десктоп) — galaxy input ─── */}
+            <form onSubmit={handleSearch} className="hidden lg:block flex-1 max-w-md mx-auto">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6F7A99]" />
+                <Input
+                  type="search"
+                  placeholder="Поиск игр, ключей, пополнений..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 bg-[rgba(255,255,255,0.06)] text-white placeholder:text-[rgba(255,255,255,0.28)] border border-[rgba(0,229,255,0.20)] rounded-2xl text-sm backdrop-blur-xl focus-visible:ring-2 focus-visible:ring-[#00E5FF]/35 focus-visible:border-[#00E5FF]/28 shadow-[0_10px_34px_rgba(0,229,255,0.06)]"
+                />
+              </div>
+            </form>
+
+            {/* ─── Правая секция ─── */}
+            <div className="flex items-center gap-0.5 sm:gap-2">
+              {/* Поиск (мобильный) */}
+              <button
+                onClick={() => setSearchOpen(true)}
+                className="lg:hidden flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl text-[rgba(255,255,255,0.5)] hover:text-white hover:bg-[rgba(0,148,255,0.10)] hover:border-[rgba(0,148,255,0.20)] border border-transparent active:scale-95 transition-all"
+                aria-label="Поиск"
+              >
+                <Search className="h-5 w-5" />
+              </button>
+
+              {/* Категории (десктоп) */}
+              <nav className="hidden xl:flex items-center gap-1 mr-2">
+                <div className="relative"
+                  onMouseEnter={() => setCatalogOpen(true)}
+                  onMouseLeave={() => setCatalogOpen(false)}>
+                  <button className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-[#A9B4D0] hover:text-white rounded-xl hover:bg-[rgba(0,148,255,0.08)] hover:border-[rgba(0,148,255,0.15)] border border-transparent transition-all duration-200">
+                    Всё <ChevronDown className={`h-3.5 w-3.5 transition-transform ${catalogOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {catalogOpen && (
+                    <div className="absolute left-0 top-full mt-1 w-52 rounded-xl border border-[rgba(0,148,255,0.15)] bg-[rgba(8,12,25,0.95)] backdrop-blur-2xl p-2 shadow-2xl shadow-[rgba(0,148,255,0.12)] animate-fade-in-up">
+                      {displayCategories.map((cat) => (
+                        <Link key={cat.slug} to={`/catalog?category=${cat.slug}`}
+                          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#A9B4D0] hover:text-white hover:bg-[rgba(0,148,255,0.08)] transition-colors">
+                          {"icon" in cat && cat.icon && <span className="text-lg">{cat.icon}</span>}
+                          <span>{cat.name}</span>
+                        </Link>
+                      ))}
+                      <div className="mt-1 border-t border-[rgba(0,148,255,0.08)] pt-1">
+                        <Link to="/catalog"
+                          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#00E5FF] hover:bg-[rgba(0,148,255,0.08)]">
+                          <Package className="h-4 w-4" /> Все товары
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </nav>
+
+              {/* Пользователь */}
+              {user ? (
+                <div className="relative"
+                  onMouseEnter={() => setUserMenuOpen(true)}
+                  onMouseLeave={() => setUserMenuOpen(false)}>
+                  <button className="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl text-[rgba(255,255,255,0.5)] hover:text-white hover:bg-[rgba(0,148,255,0.10)] hover:border-[rgba(0,148,255,0.20)] border border-transparent active:scale-95 transition-all">
+                    <User className="h-5 w-5" />
+                  </button>
+                  {userMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-[rgba(0,148,255,0.15)] bg-[rgba(8,12,25,0.95)] backdrop-blur-2xl p-2 shadow-2xl shadow-[rgba(0,148,255,0.12)] animate-fade-in-up">
+                      <Link to="/dashboard" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#A9B4D0] hover:text-white hover:bg-[rgba(0,148,255,0.08)]"><User className="h-4 w-4" /> Личный кабинет</Link>
+                      <Link to="/orders" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#A9B4D0] hover:text-white hover:bg-[rgba(0,148,255,0.08)]"><Package className="h-4 w-4" /> Мои заказы</Link>
+                      {isAdmin && <Link to="/admin" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#00E5FF] hover:bg-[rgba(0,148,255,0.08)]"><Shield className="h-4 w-4" /> Админ-панель</Link>}
+                      <div className="mt-1 border-t border-[rgba(0,148,255,0.08)] pt-1">
+                        <button onClick={() => { logout(); setUserMenuOpen(false) }}
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#FF4D6D] hover:bg-red-500/10"><LogOut className="h-4 w-4" /> Выйти</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link to="/login">
+                  <Button variant="ghost" size="icon"
+                    className="w-10 h-10 sm:w-11 sm:h-11 text-[rgba(255,255,255,0.5)] hover:text-white hover:bg-[rgba(0,148,255,0.10)]">
+                    <User className="h-5 w-5" />
+                  </Button>
+                </Link>
+              )}
+
+              {/* Мобильное меню */}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl text-[rgba(255,255,255,0.5)] hover:text-white hover:bg-[rgba(0,148,255,0.10)] hover:border-[rgba(0,148,255,0.20)] border border-transparent active:scale-95 transition-all xl:hidden"
+                aria-label="Меню"
+              >
+                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ─── Полноэкранный поиск (мобильный) ─── */}
+      {searchOpen && (
+        <div className="fixed inset-0 z-[100] bg-[rgba(6,11,26,0.98)] backdrop-blur-2xl flex flex-col p-4 pt-12 lg:hidden animate-fade-in-up">
+          <div className="flex items-center justify-between mb-6">
+            <span className="text-lg font-bold text-white">Поиск</span>
+            <button onClick={() => setSearchOpen(false)}
+              className="flex items-center justify-center w-11 h-11 rounded-xl text-[rgba(255,255,255,0.5)] hover:text-white hover:bg-[rgba(0,148,255,0.10)] active:scale-95 transition-all">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          <form onSubmit={handleSearch}>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#6F7A99]" />
               <Input
                 type="search"
                 placeholder="Поиск игр, ключей, пополнений..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 bg-card text-card-foreground placeholder:text-muted-foreground shadow-sm border border-border/80 focus-visible:ring-2 focus-visible:ring-ring"
+                autoFocus
+                className="w-full pl-12 pr-4 h-14 bg-[rgba(255,255,255,0.08)] text-white placeholder:text-[rgba(255,255,255,0.3)] border border-[rgba(0,229,255,0.20)] rounded-2xl text-base backdrop-blur-md focus-visible:ring-2 focus-visible:ring-[#00E5FF]/35"
               />
             </div>
           </form>
-
-          {/* Навигация */}
-          <nav className="hidden items-center gap-1 md:flex">
-            {/* Каталог с выпадающим меню */}
-            <div
-              className="relative"
-              onMouseEnter={() => setCatalogOpen(true)}
-              onMouseLeave={() => setCatalogOpen(false)}
-            >
-              <button className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
-                Каталог
-                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${catalogOpen ? "rotate-180" : ""}`} />
-              </button>
-              {catalogOpen && (
-                <div className="absolute left-0 top-full mt-1 w-56 rounded-xl border bg-white p-2 shadow-lg animate-in fade-in slide-in-from-top-2">
-                  {displayCategories.map((cat) => (
-                    <Link
-                      key={cat.slug}
-                      to={`/catalog?category=${cat.slug}`}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-secondary transition-colors"
-                    >
-                      {"icon" in cat && cat.icon && <span className="text-lg">{cat.icon}</span>}
-                      <span>{cat.name}</span>
-                    </Link>
-                  ))}
-                  <div className="mt-1 border-t pt-1">
-                    <Link
-                      to="/catalog"
-                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
-                    >
-                      <Package className="h-4 w-4" />
-                      Все товары
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <Link
-              to="/about"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-            >
-              О нас
-            </Link>
-
-            <Link
-              to="/faq"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-            >
-              FAQ
-            </Link>
-
-            {/* Пользователь */}
-            {user ? (
-              <div
-                className="relative"
-                onMouseEnter={() => setUserMenuOpen(true)}
-                onMouseLeave={() => setUserMenuOpen(false)}
-              >
-                <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
-                  <User className="h-4 w-4" />
-                  <span className="hidden lg:inline">{user.email?.split("@")[0]}</span>
-                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${userMenuOpen ? "rotate-180" : ""}`} />
-                </button>
-                {userMenuOpen && (
-                  <div className="absolute right-0 top-full mt-1 w-56 rounded-xl border bg-white p-2 shadow-lg animate-in fade-in slide-in-from-top-2">
-                    <Link
-                      to="/dashboard"
-                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-secondary transition-colors"
-                    >
-                      <User className="h-4 w-4" />
-                      Личный кабинет
-                    </Link>
-                    <Link
-                      to="/orders"
-                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-secondary transition-colors"
-                    >
-                      <Package className="h-4 w-4" />
-                      Мои заказы
-                    </Link>
-                    {isAdmin && (
-                      <Link
-                        to="/admin"
-                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
-                      >
-                        <Shield className="h-4 w-4" />
-                        Админ-панель
-                      </Link>
-                    )}
-                    <div className="mt-1 border-t pt-1">
-                      <button
-                        onClick={logout}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        Выйти
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <Link to="/login">
-                <Button variant="outline" size="sm" className="gap-1">
-                  <User className="h-4 w-4" />
-                  Войти
-                </Button>
-              </Link>
-            )}
-
-            {/* Корзина */}
-            <Link to="/cart">
-              <Button variant="ghost" size="icon" className="relative">
-                <ShoppingCart className="h-5 w-5" />
-                {itemCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground animate-in zoom-in">
-                    {itemCount > 99 ? "99+" : itemCount}
-                  </span>
-                )}
-              </Button>
-            </Link>
-
-            {/* Персонаж */}
-            <div className="hidden sm:flex items-center ml-1">
-              <img
-                src="/header-character.jpg"
-                alt="CifraMall"
-                className="h-9 w-9 md:h-10 md:w-10 rounded-full object-cover ring-2 ring-[#FF7A00]/30 shadow-sm transition-transform hover:scale-110 hover:ring-[#FF7A00]/50"
-              />
-            </div>
-          </nav>
-
-          {/* Персонаж (мобильный) */}
-          <div className="flex sm:hidden items-center">
-            <img
-              src="/header-character.jpg"
-              alt="CifraMall"
-              className="h-7 w-7 rounded-full object-cover ring-2 ring-[#FF7A00]/30 shadow-sm transition-transform hover:scale-110"
-            />
-          </div>
-
-          {/* Мобильное меню */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="flex items-center justify-center rounded-lg p-2 md:hidden hover:bg-secondary"
-            aria-label="Меню"
-          >
-            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
-        </div>
-      </div>
-
-      {/* Мобильное меню */}
-      {mobileMenuOpen && (
-        <div className="border-t border-border/40 bg-background md:hidden">
-          <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
-            <form onSubmit={handleSearch} className="mb-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Поиск товаров..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 bg-card text-card-foreground placeholder:text-muted-foreground border border-border/80 shadow-sm"
-                />
-              </div>
-            </form>
-            <nav className="flex flex-col gap-1">
-              <Link
-                to="/catalog"
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <Package className="h-4 w-4" />
-                Каталог
-              </Link>
-              {displayCategories.slice(0, 4).map((cat) => (
-                <Link
-                  key={cat.slug}
-                  to={`/catalog?category=${cat.slug}`}
-                  className="ml-6 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-secondary"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {"icon" in cat && cat.icon && <span className="mr-2">{cat.icon}</span>}
-                  {cat.name}
-                </Link>
-              ))}
-              <Link
-                to="/about"
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <Headphones className="h-4 w-4" />
-                О нас
-              </Link>
-              <Link
-                to="/faq"
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <Zap className="h-4 w-4" />
-                FAQ
-              </Link>
-              <div className="my-2 border-t" />
-              {user ? (
-                <>
-                  <Link
-                    to="/dashboard"
-                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <User className="h-4 w-4" />
-                    Личный кабинет
-                  </Link>
-                  <Link
-                    to="/orders"
-                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Package className="h-4 w-4" />
-                    Мои заказы
-                  </Link>
-                  {isAdmin && (
-                    <Link
-                      to="/admin"
-                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-primary"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Shield className="h-4 w-4" />
-                      Админ-панель
-                    </Link>
-                  )}
-                  <button
-                    onClick={() => { logout(); setMobileMenuOpen(false) }}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-500 hover:bg-red-50"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Выйти
-                  </button>
-                </>
-              ) : (
-                <Link
-                  to="/login"
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <User className="h-4 w-4" />
-                  Войти
-                </Link>
-              )}
-              <Link
-                to="/cart"
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <ShoppingCart className="h-4 w-4" />
-                Корзина {itemCount > 0 && `(${itemCount})`}
-              </Link>
-            </nav>
+          <div className="mt-6 text-center text-sm text-[#6F7A99]">
+            Введите название игры или товара
           </div>
         </div>
       )}
-    </header>
+
+      {/* ─── Мобильное меню ─── */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-[100] bg-[rgba(6,11,26,0.98)] backdrop-blur-2xl flex flex-col xl:hidden animate-fade-in-up">
+          <div className="flex items-center justify-between p-4 pt-12">
+            <span className="text-lg font-bold text-white">Меню</span>
+            <button onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-center w-11 h-11 rounded-xl text-[rgba(255,255,255,0.5)] hover:text-white hover:bg-[rgba(0,148,255,0.10)] active:scale-95 transition-all">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 pb-8">
+            <div className="space-y-1">
+              <Link to="/catalog" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium text-white hover:bg-[rgba(0,148,255,0.10)] active:scale-[0.98] transition-all"
+                onClick={() => setMobileMenuOpen(false)}>
+                <Package className="h-5 w-5 text-[#0094FF]" />
+                Каталог
+              </Link>
+              <div className="h-px bg-[rgba(0,148,255,0.08)] my-3" />
+              {user ? (
+                <>
+                  <Link to="/dashboard" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm text-[#A9B4D0] hover:text-white hover:bg-[rgba(0,148,255,0.08)] active:scale-[0.98] transition-all"
+                    onClick={() => setMobileMenuOpen(false)}>
+                    <User className="h-5 w-5" /> Личный кабинет
+                  </Link>
+                  <Link to="/orders" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm text-[#A9B4D0] hover:text-white hover:bg-[rgba(0,148,255,0.08)] active:scale-[0.98] transition-all"
+                    onClick={() => setMobileMenuOpen(false)}>
+                    <Package className="h-5 w-5" /> Мои заказы
+                  </Link>
+                  {isAdmin && <Link to="/admin" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium text-[#00E5FF] hover:bg-[rgba(0,148,255,0.08)] active:scale-[0.98] transition-all"
+                    onClick={() => setMobileMenuOpen(false)}>
+                    <Shield className="h-5 w-5" /> Админ-панель
+                  </Link>}
+                  <button onClick={() => { logout(); setMobileMenuOpen(false) }}
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-sm text-[#FF4D6D] hover:bg-red-500/10 active:scale-[0.98] transition-all">
+                    <LogOut className="h-5 w-5" /> Выйти
+                  </button>
+                </>
+              ) : (
+                <Link to="/login" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium text-white hover:bg-[rgba(0,148,255,0.10)] active:scale-[0.98] transition-all"
+                  onClick={() => setMobileMenuOpen(false)}>
+                  <User className="h-5 w-5" /> Войти
+                </Link>
+              )}
+              <Link to="/faq" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm text-[rgba(255,255,255,0.4)] hover:text-white hover:bg-[rgba(0,148,255,0.08)] active:scale-[0.98] transition-all"
+                onClick={() => setMobileMenuOpen(false)}>
+                <Headphones className="h-5 w-5" /> FAQ
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

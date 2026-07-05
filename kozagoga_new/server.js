@@ -557,7 +557,14 @@ app.post('/api/precheck', async (req, res) => {
     const { product_id, amount } = req.body
     if (!product_id || !amount) return res.status(400).json({ error: 'product_id и amount обязательны' })
 
-    const productRes = await pool.query('SELECT * FROM products WHERE id = $1', [product_id])
+    let productRes
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (uuidRe.test(product_id)) {
+      productRes = await pool.query('SELECT * FROM products WHERE id = $1', [product_id])
+    }
+    if (!productRes || productRes.rows.length === 0) {
+      productRes = await pool.query('SELECT * FROM products WHERE slug = $1', [product_id])
+    }
     if (productRes.rows.length === 0) return res.status(404).json({ error: 'Товар не найден' })
 
     const product = productRes.rows[0]
@@ -640,7 +647,15 @@ app.post('/api/orders', requireAuth, rateLimit(getRateLimits().orders || 30), as
       const orderItemsData = []
 
       for (const item of items) {
-        const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id])
+        let prodRes
+        // Пробуем поиск по UUID; если значение не UUID — ловим ошибку и ищем по slug
+        const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        if (uuidRe.test(item.product_id)) {
+          prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id])
+        }
+        if (!prodRes || prodRes.rows.length === 0) {
+          prodRes = await client.query('SELECT * FROM products WHERE slug = $1', [item.product_id])
+        }
         if (prodRes.rows.length === 0) {
           throw new Error(`Товар ${item.product_id} не найден`)
         }

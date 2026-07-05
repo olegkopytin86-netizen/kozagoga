@@ -4,62 +4,59 @@
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
     'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 
-  /* Основная палитра — оранжевый + серый + чёрный/белый */
-  --color-koz-50: #fff7ed;
-  --color-koz-100: #ffedd5;
-  --color-koz-200: #fed7aa;
-  --color-koz-300: #fdba74;
-  --color-koz-400: #fb923c;
-  --color-koz-500: #f97316;
-  --color-koz-600: #ea580c;
-  --color-koz-700: #c2410c;
-  --color-koz-800: #9a3412;
-  --color-koz-900: #7c2d12;
+  /* ════════════════════════════════════════════ */
+  /* CifraMall Galaxy Blue Premium Palette       */
+  /* ════════════════════════════════════════════ */
 
-  /* Системные цвета */
-  --color-background: oklch(100% 0 0);
-  --color-foreground: oklch(12% 0.01 285.75);
-  --color-card: oklch(100% 0 0);
-  --color-card-foreground: oklch(12% 0.01 285.75);
-  --color-popover: oklch(100% 0 0);
-  --color-popover-foreground: oklch(12% 0.01 285.75);
-  --color-primary: #f97316;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: oklch(96% 0.003 285.75);
-  --color-secondary-foreground: oklch(12% 0.01 285.75);
-  --color-muted: oklch(96% 0.003 285.75);
-  --color-muted-foreground: oklch(52% 0.01 285.75);
-  --color-accent: #f97316;
-  --color-accent-foreground: #ffffff;
+  /* Background */
+  --color-bg-midnight: #060B1A;
+  --color-bg-deep-navy: #0F1B3D;
+  --color-bg-space-blue: #081326;
+  --color-bg-dark-graphite: #0B0F19;
+
+  /* Primary */
+  --color-cyber-blue: #0094FF;
+  --color-aqua: #00E5FF;
+
+  /* Additional Accent */
+  --color-electric-indigo: #4F46E5;
+  --color-soft-violet: #7C3AED;
+
+  /* Action Colors */
+  --color-cm-orange: #FF8C00;
+  --color-warm-gold: #FFC247;
+
+  /* Text */
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #A9B4D0;
+  --color-text-muted: #6F7A99;
+
+  /* Status */
+  --color-success: #00E096;
+  --color-error: #FF4D6D;
+
+  /* Legacy aliases for shadcn compatibility */
+  --color-background: #060B1A;
+  --color-foreground: #FFFFFF;
+  --color-card: rgba(255,255,255,0.05);
+  --color-card-foreground: #FFFFFF;
+  --color-popover: #0B0F19;
+  --color-popover-foreground: #FFFFFF;
+  --color-primary: #0094FF;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: rgba(255,255,255,0.08);
+  --color-secondary-foreground: #A9B4D0;
+  --color-muted: rgba(255,255,255,0.06);
+  --color-muted-foreground: #6F7A99;
+  --color-accent: #4F46E5;
+  --color-accent-foreground: #FFFFFF;
   --color-destructive: oklch(62% 0.22 29);
-  --color-destructive-foreground: #ffffff;
-  --color-border: oklch(91% 0.005 285.75);
-  --color-input: oklch(91% 0.005 285.75);
-  --color-ring: #f97316;
+  --color-destructive-foreground: #FFFFFF;
+  --color-border: rgba(255,255,255,0.12);
+  --color-input: rgba(255,255,255,0.10);
+  --color-ring: #0094FF;
 
-  --radius: 0.625rem;
-}
-
-@theme dark {
-  --color-background: oklch(9% 0.01 285.75);
-  --color-foreground: oklch(98% 0.003 285.75);
-  --color-card: oklch(14% 0.01 285.75);
-  --color-card-foreground: oklch(98% 0.003 285.75);
-  --color-popover: oklch(14% 0.01 285.75);
-  --color-popover-foreground: oklch(98% 0.003 285.75);
-  --color-primary: #f97316;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: oklch(24% 0.01 285.75);
-  --color-secondary-foreground: oklch(98% 0.003 285.75);
-  --color-muted: oklch(24% 0.01 285.75);
-  --color-muted-foreground: oklch(68% 0.01 285.75);
-  --color-accent: #f97316;
-  --color-accent-foreground: #ffffff;
-  --color-destructive: oklch(38% 0.18 29);
-  --color-destructive-foreground: #ffffff;
-  --color-border: oklch(24% 0.01 285.75);
-  --color-input: oklch(24% 0.01 285.75);
-  --color-ring: #f97316;
+  --radius: 0.75rem;
 }
 
 @layer base {
@@ -68,43 +65,459 @@
   }
 
   body {
-    background-color: var(--color-background);
+    background:
+      radial-gradient(circle at 20% 4%, rgba(0,148,255,0.20) 0%, rgba(0,148,255,0.08) 20%, transparent 44%),
+      radial-gradient(circle at 84% 14%, rgba(0,229,255,0.10) 0%, rgba(0,229,255,0.04) 18%, transparent 40%),
+      radial-gradient(circle at 50% 46%, rgba(79,70,229,0.14) 0%, rgba(79,70,229,0.06) 28%, transparent 52%),
+      radial-gradient(circle at 22% 70%, rgba(0,148,255,0.08) 0%, transparent 36%),
+      radial-gradient(circle at 78% 62%, rgba(0,229,255,0.06) 0%, transparent 34%),
+      linear-gradient(180deg, #060B1A 0%, #0F1B3D 20%, #081326 52%, #060B1A 78%, #060B1A 100%);
+    background-attachment: fixed;
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Layer 1: Blue ambient glow */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(circle at 14% 18%, rgba(0,148,255,0.26) 0%, transparent 44%),
+      radial-gradient(circle at 86% 28%, rgba(0,229,255,0.12) 0%, transparent 38%),
+      radial-gradient(circle at 48% 72%, rgba(79,70,229,0.18) 0%, transparent 42%),
+      radial-gradient(circle at 32% 78%, rgba(0,148,255,0.08) 0%, transparent 32%);
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Layer 2: Digital grid + subtle particles + light lines */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      /* Digital grid — very subtle */
+      linear-gradient(rgba(255,255,255,0.020) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px),
+      /* Subtle diagonal light lines */
+      repeating-linear-gradient(45deg, transparent, transparent 160px, rgba(0,148,255,0.012) 160px, rgba(0,148,255,0.012) 161px),
+      repeating-linear-gradient(-45deg, transparent, transparent 220px, rgba(0,229,255,0.010) 220px, rgba(0,229,255,0.010) 221px),
+      /* Cosmic particles */
+      radial-gradient(circle at 16% 30%, rgba(255,255,255,0.03) 0 1px, transparent 2px),
+      radial-gradient(circle at 72% 20%, rgba(0,229,255,0.05) 0 1px, transparent 2px),
+      radial-gradient(circle at 52% 68%, rgba(0,148,255,0.04) 0 1px, transparent 2px),
+      radial-gradient(circle at 28% 54%, rgba(79,70,229,0.03) 0 1px, transparent 2px),
+      radial-gradient(circle at 86% 76%, rgba(0,229,255,0.03) 0 1px, transparent 2px);
+    background-size:
+      60px 60px, 60px 60px,
+      320px 320px, 440px 440px,
+      280px 280px, 340px 340px, 400px 400px, 260px 260px, 300px 300px;
+    opacity: 0.30;
+    pointer-events: none;
+    z-index: 0;
+    mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 84%, transparent 100%);
+  }
+
+  #root {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+  ::-webkit-scrollbar-thumb { background: rgba(0,148,255,0.18); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(0,148,255,0.32); }
+
+  /* Smooth selection color */
+  ::selection {
+    background: rgba(0,148,255,0.28);
+    color: #FFFFFF;
   }
 }
 
-/* Анимации */
+/* ─── Galaxy Blue Animations ─── */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.65; transform: scale(1.08); }
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes borderGlow {
+  0%, 100% {
+    border-color: rgba(0,148,255,0.25);
+    box-shadow: 0 0 20px rgba(0,148,255,0.10), 0 0 40px rgba(0,229,255,0.06);
+  }
+  50% {
+    border-color: rgba(0,229,255,0.25);
+    box-shadow: 0 0 30px rgba(0,229,255,0.12), 0 0 60px rgba(0,148,255,0.08);
+  }
 }
 
 @layer utilities {
   .animate-fade-in-up {
     animation: fadeInUp 0.6s ease-out forwards;
   }
-  .animate-shimmer {
-    background: linear-gradient(90deg, transparent, rgba(0,0,0,0.05), transparent);
-    background-size: 200% 100%;
-    animation: shimmer 2s infinite;
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
   }
-}
+  .animate-glow-pulse {
+    animation: glowPulse 3s ease-in-out infinite;
+  }
+  .animate-gradient-shift {
+    background-size: 200% 200%;
+    animation: gradientShift 4s ease-in-out infinite;
+  }
+  .animate-border-glow {
+    animation: borderGlow 3s ease-in-out infinite;
+  }
 
-/* ─── Animations ─── */
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
+  /* ─── Galaxy Premium Glass ─── */
+  .galaxy-glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(0, 229, 255, 0.18);
+    box-shadow: 0 30px 80px rgba(0, 148, 255, 0.16), 0 0 40px rgba(0, 229, 255, 0.05);
+  }
 
-@keyframes glow-pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
+  .galaxy-glass:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(0, 148, 255, 0.32);
+    box-shadow: 0 35px 90px rgba(0, 148, 255, 0.22), 0 0 60px rgba(0, 229, 255, 0.08);
+  }
+
+  /* ─── Galaxy Card (gaming poster style) ─── */
+  .galaxy-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(0, 229, 255, 0.20);
+    box-shadow:
+      0 20px 60px rgba(0, 148, 255, 0.14),
+      0 0 40px rgba(0, 229, 255, 0.08);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: all 300ms ease;
+  }
+
+  .galaxy-card:hover {
+    border-color: rgba(0, 148, 255, 0.35);
+    box-shadow:
+      0 30px 90px rgba(0, 148, 255, 0.26),
+      0 0 60px rgba(0, 229, 255, 0.18);
+    transform: translateY(-5px);
+  }
+
+  /* ─── Galaxy Gradient Button (Blue → Aqua) ─── */
+  .galaxy-gradient-btn {
+    background: linear-gradient(135deg, #0094FF 0%, #00E5FF 100%);
+    background-size: 200% 200%;
+    box-shadow:
+      0 12px 40px rgba(0, 148, 255, 0.25),
+      0 0 30px rgba(0, 229, 255, 0.10);
+    color: #FFFFFF;
+    font-weight: 600;
+    transition: all 300ms ease;
+  }
+
+  .galaxy-gradient-btn:hover {
+    background-position: 100% 50%;
+    box-shadow:
+      0 16px 50px rgba(0, 148, 255, 0.35),
+      0 0 50px rgba(0, 229, 255, 0.16);
+    transform: translateY(-2px);
+  }
+
+  .galaxy-gradient-btn:active {
+    transform: translateY(1px);
+    box-shadow:
+      0 8px 30px rgba(0, 148, 255, 0.20),
+      0 0 20px rgba(0, 229, 255, 0.08);
+  }
+
+  /* ─── Galaxy CTA Button (Blue → Aqua → Orange) ─── */
+  .galaxy-cta-btn {
+    background: linear-gradient(135deg, #0094FF 0%, #00E5FF 50%, #FF8C00 100%);
+    background-size: 200% 200%;
+    box-shadow:
+      0 14px 44px rgba(0, 148, 255, 0.28),
+      0 0 30px rgba(255, 140, 0, 0.12);
+    color: #FFFFFF;
+    font-weight: 600;
+    transition: all 300ms ease;
+  }
+
+  .galaxy-cta-btn:hover {
+    background-position: 100% 50%;
+    box-shadow:
+      0 18px 54px rgba(0, 148, 255, 0.38),
+      0 0 50px rgba(255, 140, 0, 0.18);
+    transform: translateY(-2px);
+  }
+
+  .galaxy-cta-btn:active {
+    transform: translateY(1px);
+  }
+
+  /* ─── Text Glow Effects ─── */
+  .text-glow-blue {
+    text-shadow: 0 0 20px rgba(0, 148, 255, 0.40), 0 0 60px rgba(0, 148, 255, 0.15);
+  }
+
+  .text-glow-aqua {
+    text-shadow: 0 0 20px rgba(0, 229, 255, 0.40), 0 0 60px rgba(0, 229, 255, 0.15);
+  }
+
+  .text-glow-indigo {
+    text-shadow: 0 0 20px rgba(79, 70, 229, 0.40), 0 0 60px rgba(79, 70, 229, 0.15);
+  }
+
+  /* ─── Box Glow ─── */
+  .glow-blue {
+    box-shadow: 0 0 30px rgba(0, 148, 255, 0.15), 0 0 60px rgba(0, 148, 255, 0.08);
+  }
+
+  .glow-aqua {
+    box-shadow: 0 0 30px rgba(0, 229, 255, 0.15), 0 0 60px rgba(0, 229, 255, 0.08);
+  }
+
+  .glow-indigo {
+    box-shadow: 0 0 30px rgba(79, 70, 229, 0.15), 0 0 60px rgba(79, 70, 229, 0.08);
+  }
+
+  /* ─── Neon Border ─── */
+  .border-neon-blue {
+    border: 1px solid rgba(0, 148, 255, 0.25);
+    box-shadow: 0 0 15px rgba(0, 148, 255, 0.10);
+  }
+
+  .border-neon-aqua {
+    border: 1px solid rgba(0, 229, 255, 0.25);
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.10);
+  }
+
+  /* ─── Hover Lift ─── */
+  .hover-lift {
+    transition: transform 300ms ease, box-shadow 300ms ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-5px);
+  }
+  .hover-lift:active {
+    transform: translateY(-2px);
+  }
+
+  /* ─── Tap highlight ─── */
+  .tap-highlight {
+    -webkit-tap-highlight-color: rgba(0, 148, 255, 0.2);
+  }
+
+  /* ─── Safe area ─── */
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* ─── Press scale ─── */
+  .press-scale {
+    transition: transform 0.1s ease;
+  }
+  .press-scale:active {
+    transform: scale(0.96);
+  }
+
+  /* ─── Gradient Text ─── */
+  .text-galaxy-gradient {
+    background: linear-gradient(135deg, #0094FF 0%, #00E5FF 60%, #FFC247 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ─── Galaxy Grid Overlay ─── */
+  .galaxy-grid {
+    background-image:
+      linear-gradient(rgba(0, 148, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 229, 255, 0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* ─── Igromir-style Gamestore Card ─── */
+  .gamestore-card {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 0.8rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    justify-content: flex-end;
+    box-shadow: 0 2rem 3.2rem -0.8rem rgba(0,0,0,0.50);
+    color: #FFFFFF;
+    transition: border-color 0.15s ease;
+  }
+
+  /* Border overlay — 17% white, full white on hover (как на igromir) */
+  .gamestore-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 0.2rem solid rgba(255,255,255,0.17);
+    border-radius: inherit;
+    pointer-events: none;
+    transition: border-color 0.15s ease;
+    z-index: 2;
+  }
+
+  .gamestore-card:hover::before {
+    border-color: #FFFFFF;
+  }
+
+  /* Background image — cover, scale on hover */
+  .gamestore-card-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: 50%;
+    background-repeat: no-repeat;
+    transition: transform 0.3s ease-out;
+  }
+
+  .gamestore-card:hover .gamestore-card-bg {
+    transform: scale(1.1);
+  }
+
+  /* Blurred gradient layer behind content (как на igromir) */
+  .gamestore-card-gradient {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: 50%;
+    background-repeat: no-repeat;
+    filter: blur(4rem);
+    transform: scale(1.1);
+    opacity: 0.6;
+    z-index: -1;
+  }
+
+  /* Content overlay — с затемнением для читаемости */
+  .gamestore-card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    justify-content: flex-end;
+    z-index: 2;
+    padding: 1.6rem;
+    position: relative;
+  }
+
+  /* Тёмный градиент за текстом */
+  .gamestore-card-content::before {
+    content: "";
+    position: absolute;
+    inset: -2rem -1.6rem -1.6rem -1.6rem;
+    background: linear-gradient(to top, rgba(6,11,26,0.85) 0%, rgba(6,11,26,0.60) 40%, transparent 80%);
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* Icon + title row */
+  .gamestore-card-icon-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  /* Logo icon with mask */
+  .gamestore-card-icon {
+    height: 4rem;
+    width: 4rem;
+    background: #FFFFFF;
+    -webkit-mask-size: cover;
+    mask-size: cover;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    flex-shrink: 0;
+  }
+
+  .gamestore-card-title {
+    word-wrap: break-word;
+    font-weight: 700;
+    font-size: 1.6rem;
+    line-height: 2.2rem;
+    letter-spacing: -0.04rem;
+    color: #FFFFFF;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.90);
+  }
+
+  .gamestore-card-desc {
+    font-size: 1.2rem;
+    line-height: 1.6rem;
+    color: rgba(255,255,255,0.75);
+    text-shadow: 0 2px 10px rgba(0,0,0,0.90);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* На мобильных — мельче */
+  @media (max-width: 639px) {
+    .gamestore-card-desc {
+      font-size: 1rem;
+      line-height: 1.3rem;
+    }
+    .gamestore-card-content {
+      padding: 0.8rem;
+    }
+    .gamestore-card-content::before {
+      inset: -1rem -0.8rem -0.8rem -0.8rem;
+    }
+  }
+
+  /* На совсем маленьких экранах */
+  @media (max-width: 380px) {
+    .gamestore-card-desc {
+      font-size: 0.85rem;
+      line-height: 1.1rem;
+    }
+  }
+
+  /* ─── Scrollbar hide ─── */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }

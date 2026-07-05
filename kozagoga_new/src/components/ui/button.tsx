@@ -8,13 +8,23 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-koz-600 shadow-sm",
+        default: "bg-primary text-primary-foreground hover:opacity-90 shadow-sm",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline: "border border-input bg-background hover:bg-secondary hover:text-foreground",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-secondary hover:text-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         "outline-primary": "border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground",
+        /* Galaxy blue gradient */
+        galaxy: [
+          "galaxy-gradient-btn",
+          "animate-gradient-shift",
+        ].join(" "),
+        /* Galaxy CTA (blue → aqua → orange) */
+        "galaxy-cta": [
+          "galaxy-cta-btn",
+          "animate-gradient-shift",
+        ].join(" "),
       },
       size: {
         default: "h-10 px-4 py-2",
