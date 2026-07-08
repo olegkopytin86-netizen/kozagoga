@@ -199,19 +199,15 @@ export default function ProductDetail() {
 
               <Button
                 size="lg"
-                className="w-full gap-3 bg-[#007AFF] text-white hover:bg-[#0066d6] shadow-lg text-base h-14"
+                className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:bg-transparent"
                 disabled={isProcessing}
                 onClick={() => handlePayment("sbp")}
               >
-                {isProcessing && paymentMethod === "sbp" ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <Smartphone className="h-6 w-6" />
-                )}
-                <span className="flex flex-col items-start leading-tight">
-                  <span>СБП</span>
-                  <span className="text-[11px] opacity-75">Система быстрых платежей</span>
-                </span>
+                <img
+                  src="/assets/sbp_button_product_card_600x200.jpg"
+                  alt="СБП"
+                  className="block w-full h-auto"
+                />
               </Button>
 
               <Button

@@ -48,7 +48,7 @@ export const popularProducts: GameProduct[] = [
     name: "XBOX Live Gift Card",
     description: "Пополнение кошелька Xbox. Игры, подписка Game Pass, дополнения. Моментальная доставка на email.",
     price: 1799,
-    image: "/images/products/xbox.png",
+    image: "/images/products/sberpay-card.jpg",
     category: "Подарочные карты",
     badge: "-15%",
     rating: 4.6,

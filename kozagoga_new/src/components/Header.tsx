@@ -57,23 +57,13 @@ export default function Header() {
       >
         <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
           <div className="flex h-14 sm:h-[90px] lg:h-[130px] items-center justify-between relative">
-            {/* ─── Левая часть: CifraMall logo + mascot ─── */}
+            {/* ─── Левая часть: CifraMall logo (персонаж скрыт, потом отладим) ─── */}
             <Link to="/" className="flex items-center gap-2 sm:gap-5 shrink-0 group">
               <div className="flex flex-col leading-none">
                 <span className="text-xl sm:text-[32px] lg:text-[56px] font-bold tracking-tight leading-none">
                   <span className="text-white drop-shadow-[0_0_20px_rgba(0,148,255,0.30)]">Cifra</span>
                   <span className="text-galaxy-gradient">Mall</span>
                 </span>
-              </div>
-              {/* Mascot с galaxy glow */}
-              <div className="relative -ml-1 sm:-ml-3 mt-2 sm:mt-8 self-end">
-                <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[80px] h-[56px] sm:w-[210px] sm:h-[140px] rounded-full bg-[#0094FF]/18 blur-[46px] sm:blur-[76px] animate-glow-pulse pointer-events-none" />
-                <div className="absolute bottom-[10%] left-[62%] -translate-x-1/2 w-[54px] h-[40px] sm:w-[140px] sm:h-[96px] rounded-full bg-[#00E5FF]/10 blur-[36px] sm:blur-[64px] pointer-events-none" />
-                <img
-                  src="/images/brand/mascot-new.png"
-                  alt="CifraMall"
-                  className="relative z-10 h-10 sm:h-[70px] md:h-[100px] lg:h-[170px] xl:h-[260px] w-auto object-contain animate-float drop-shadow-[0_24px_60px_rgba(0,148,255,0.28)]"
-                />
               </div>
             </Link>
 

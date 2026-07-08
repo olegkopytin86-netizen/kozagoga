@@ -60,7 +60,7 @@ const BG_IMAGES: Record<string, string> = {
   "steam-gift-card":          "/images/products/gamestore-steam.webp",
   "playstation-network":      "/images/products/gamestore-playstation.webp",
   "sony-playstation-card":    "/images/products/gamestore-playstation.webp",
-  "xbox-live":                "/images/products/gamestore-xbox.webp",
+  "xbox-live":                "/images/products/gamestore-xbox-v3.webp",
   "nintendo-eshop":           "/images/products/gamestore-nintendo.webp",
   "nintendo-online":          "/images/products/gamestore-nintendo.webp",
   "blizzard-gift-card":       "/images/products/gamestore-battlenet.webp",
@@ -69,7 +69,7 @@ const BG_IMAGES: Record<string, string> = {
   "roblox-card-pay":          "/images/products/mts-roblox.png",
   "apex-legends":             "/images/products/mts-apex.png",
   "apex-legends-xbox":        "/images/products/mts-apex.png",
-  "appstore-itunes":          "/images/products/gamestore-apple.webp",
+  "appstore-itunes":          "/images/products/gamestore-apple-v2.webp",
   "netflix-digital":          "/images/products/gamestore-netflix.webp",
 }
 

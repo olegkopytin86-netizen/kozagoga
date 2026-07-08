@@ -10,7 +10,7 @@ const imageMap: Record<string, string> = {
   "steam-gift-card": "/images/products/igromir-steam.webp",
   "playstation-network": "/images/products/igromir-playstation.webp",
   "sony-playstation-card": "/images/products/igromir-playstation.webp",
-  "xbox-live": "/images/products/igromir-xbox.webp",
+  "xbox-live": "/images/products/igromir-xbox-v2.webp",
   "nintendo-eshop": "/images/products/igromir-nintendo.webp",
   "nintendo-online": "/images/products/igromir-nintendo.webp",
   "blizzard-gift-card": "/images/products/igromir-battlenet.webp",
@@ -69,7 +69,7 @@ const filteredProducts = enhancedProducts
 const PLATFORM_STORES = [
   { slug: "steam", label: "Steam", image: "/images/products/gamestore-steam.webp", logo: "/images/products/steam_logo.svg" },
   { slug: "playstation", label: "PlayStation", image: "/images/products/gamestore-playstation.webp", logo: null },
-  { slug: "xbox", label: "Xbox", image: "/images/products/gamestore-xbox.webp", logo: "/images/products/logo_xbox.svg" },
+  { slug: "xbox", label: "Xbox", image: "/images/products/gamestore-xbox-v3.webp", logo: "/images/products/logo_xbox.svg" },
   { slug: "nintendo", label: "Nintendo", image: "/images/products/gamestore-nintendo.webp", logo: null },
   { slug: "battlenet", label: "Battle.net", image: "/images/products/gamestore-battlenet.webp", logo: null },
 ]
