@@ -182,19 +182,15 @@ export default function ProductDetail() {
 
               <Button
                 size="lg"
-                className="w-full gap-3 bg-[#21A038] text-white hover:bg-[#1a8a2e] shadow-lg text-base h-14"
+                className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:bg-transparent"
                 disabled={isProcessing}
                 onClick={() => handlePayment("sberpay")}
               >
-                {isProcessing && paymentMethod === "sberpay" ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <Building2 className="h-6 w-6" />
-                )}
-                <span className="flex flex-col items-start leading-tight">
-                  <span>SberPay</span>
-                  <span className="text-[11px] opacity-75">Оплата через СберБанк</span>
-                </span>
+                <img
+                  src="/assets/sberpay_button_product_card_600x.jpg"
+                  alt="SberPay"
+                  className="block w-full h-auto"
+                />
               </Button>
 
               <Button
