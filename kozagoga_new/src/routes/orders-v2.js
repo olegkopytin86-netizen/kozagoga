@@ -66,7 +66,8 @@ export default function createOrdersV2Router(paymentGateways) {
       // Создание платежа
       try {
         const gatewayName = req.body.payment_method || 'wallet'
-        const gateway = resolveGateway(gatewayName)
+        const resolved = resolveGateway(gatewayName, paymentGateways)
+        const gateway = resolved?.gateway
 
         if (gateway) {
           const paymentResult = await gateway.createPayment({
