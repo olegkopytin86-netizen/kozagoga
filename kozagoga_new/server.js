@@ -45,6 +45,9 @@ const pool = getPool()
 import { getConfig, getPollingConfig, getPaymentGatewayMapping, getRateLimits, getPaymentConfig } from './lib/config-loader.js'
 import { initProviders, getProvider, listProviders } from './lib/providers/index.js'
 import { initGateways, resolveGateway } from './lib/gateways/index.js'
+import createProductsV2Router from './src/routes/products-v2.js'
+import createOrdersV2Router from './src/routes/orders-v2.js'
+import createAdminV2Router from './src/routes/admin-v2.js'
 
 // Платежные шлюзы (инициализация через фабрику)
 const paymentGateways = initGateways(pool)
@@ -218,7 +221,13 @@ app.use('/api', createLoyaltyRouter())
 app.use('/api', createSupportRouter())
 app.use('/api/products', createProductsRouter())
 app.use('/api/categories', createCategoriesRouter())
+
+// v2 API — услуги, регионы, динамические поля (Product Card Service Architecture)
+app.use('/api/v1/products', createProductsV2Router())
+app.use('/api/v1', createOrdersV2Router(paymentGateways))
+app.use('/api/admin/v2', createAdminV2Router())
 console.log('[server] Module routers mounted')
+console.log('[server] v2 API routers mounted (product card service)')
 
 // Простая санитизация текстовых полей
 function sanitizeTextField(val) {
