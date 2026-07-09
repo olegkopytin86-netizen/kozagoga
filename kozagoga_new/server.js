@@ -232,8 +232,11 @@ console.log('[server] v2 API routers mounted (product card service)')
 // Простая санитизация текстовых полей
 function sanitizeTextField(val) {
   if (typeof val !== 'string') return val
+  // XSS prevention: strip HTML tags
+  let clean = val.replace(/<[^>]*>/g, '')
   // Удаляем null-байты и непечатные символы (кроме пробелов)
-  return val.replace(/\x00/g, '').replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, '').trim()
+  clean = clean.replace(/\x00/g, '').replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, '').trim()
+  return clean
 }
 
 function requireRole(...roles) {

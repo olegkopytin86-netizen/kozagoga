@@ -29,7 +29,7 @@ export default function createOrdersV2Router(paymentGateways) {
   })
 
   // ─── POST /api/v1/orders ───────────────────────────────
-  router.post('/', async (req, res) => {
+  router.post('/orders', async (req, res) => {
     try {
       const userId = req.user?.id || req.body.user_id
       if (!userId) {
@@ -147,11 +147,19 @@ export default function createOrdersV2Router(paymentGateways) {
   })
 
   // ─── GET /api/v1/orders/:id ────────────────────────────
-  router.get('/:id', async (req, res) => {
+  router.get('/orders/:id', async (req, res) => {
     try {
       const order = await getOrderDetail(req.params.id, pool)
       if (!order) {
         return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Заказ не найден' } })
+      }
+
+      // Проверка принадлежности: только admin/superadmin или владелец
+      const userId = req.user?.id
+      if (userId && !['admin', 'superadmin'].includes(req.user?.role)) {
+        if (order.user_id !== userId) {
+          return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Этот заказ вам не принадлежит' } })
+        }
       }
 
       res.json({

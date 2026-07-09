@@ -9,7 +9,7 @@ export default function createAdminV2Router() {
   const router = Router()
   const pool = getPool()
 
-  // ─── Middleware: admin only ─────────────────────────────
+  // ─── Middleware: admin/superadmin only ──────────────────
   router.use((req, res, next) => {
     if (!req.user || !['admin', 'superadmin'].includes(req.user.role)) {
       return res.status(403).json({ error: 'FORBIDDEN', message: 'Только для администраторов' })

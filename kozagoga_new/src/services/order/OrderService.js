@@ -32,6 +32,24 @@ export async function calculatePrice(params, pool) {
   const region = regions[0]
 
   const parsedAmount = amount ? parseFloat(amount) : (region.fixed_amounts?.[0] || region.base_price)
+
+  // Проверка fixed_amounts
+  if (region.fixed_amounts && region.fixed_amounts.length > 0) {
+    if (amount && !region.fixed_amounts.includes(parsedAmount)) {
+      return {
+        error: 'INVALID_FIXED_AMOUNT',
+        message: `Доступные суммы: ${region.fixed_amounts.join(', ')} ${region.currency}`,
+      }
+    }
+  } else {
+    if (region.min_amount && parsedAmount < parseFloat(region.min_amount)) {
+      return { error: 'AMOUNT_TOO_LOW', message: `Минимальная сумма: ${region.min_amount} ${region.currency}` }
+    }
+    if (region.max_amount && parsedAmount > parseFloat(region.max_amount)) {
+      return { error: 'AMOUNT_TOO_HIGH', message: `Максимальная сумма: ${region.max_amount} ${region.currency}` }
+    }
+  }
+
   const multiplier = parseFloat(region.price_multiplier || 1)
   const finalPrice = parsedAmount * multiplier
 
@@ -181,16 +199,22 @@ export async function getOrderDetail(orderId, pool) {
 /**
  * Обновляет статус заказа.
  */
-export async function updateOrderStatus(orderId, status, pool, reason) {
+export async function updateOrderStatus(orderId, newStatus, pool, reason) {
+  // Сначала читаем старый статус, потом обновляем
+  const { rows: before } = await pool.query(
+    'SELECT status FROM orders WHERE id = $1', [orderId]
+  )
+  const oldStatus = before.length > 0 ? before[0].status : null
+
   const { rows: orders } = await pool.query(
     `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
-    [status, orderId]
+    [newStatus, orderId]
   )
   if (orders.length > 0) {
     await pool.query(
       `INSERT INTO order_status_history (order_id, from_status, to_status, changed_by, reason)
        VALUES ($1, $2, $3, 'system', $4)`,
-      [orderId, orders[0].status, status, reason || null]
+      [orderId, oldStatus, newStatus, reason || null]
     )
   }
   return orders[0]
