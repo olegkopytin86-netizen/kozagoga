@@ -49,8 +49,19 @@ import createProductsV2Router from './src/routes/products-v2.js'
 import createOrdersV2Router from './src/routes/orders-v2.js'
 import createAdminV2Router from './src/routes/admin-v2.js'
 
+import { processOrder } from './src/services/integration/IntegrationService.js'
+import PollingService from './src/services/polling/PollingService.js'
+import AlertService from './src/services/alert/AlertService.js'
+import createIdempotencyMiddleware from './src/middleware/IdempotencyMiddleware.js'
+
 // Платежные шлюзы (инициализация через фабрику)
 const paymentGateways = initGateways(pool)
+
+// FR-DELIVERY-08: сервис алертов
+const alertService = new AlertService(pool)
+
+// FR-DELIVERY-05: сервис polling
+const pollingService = new PollingService(pool, paymentGateways, alertService)
 
 // Кэш сервисов (in-memory)
 let servicesCache = []
@@ -58,6 +69,7 @@ let servicesCacheTime = 0
 
 // ─── Express setup ────────────────────────────────────────
 const app = express()
+app.locals.pool = pool
 
 // ─── Новые API роуты (SRS Modules) — Express 5 workaround ─────
 
@@ -224,7 +236,7 @@ app.use('/api/categories', createCategoriesRouter())
 
 // v2 API — услуги, регионы, динамические поля (Product Card Service Architecture)
 app.use('/api/v1/products', createProductsV2Router())
-app.use('/api/v1', createOrdersV2Router(paymentGateways))
+app.use('/api/v1', createOrdersV2Router(paymentGateways, { pollingService, alertService }))
 app.use('/api/admin/v2', createAdminV2Router())
 console.log('[server] Module routers mounted')
 console.log('[server] v2 API routers mounted (product card service)')
@@ -257,17 +269,21 @@ function requireAuth(req, res, next) {
 // ─── Auth endpoints ───────────────────────────────────────
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password } = req.body
+    const { email, password, role } = req.body
     if (!email || !password) return res.status(400).json({ error: 'Email и пароль обязательны' })
     if (password.length < 6) return res.status(400).json({ error: 'Пароль должен быть не менее 6 символов' })
 
     const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email])
     if (existing.rows.length > 0) return res.status(409).json({ error: 'Пользователь с таким email уже существует' })
 
+    // Если админ создаёт учётку — разрешаем задать роль, иначе 'user'
+    const isAdmin = req.user && ['admin', 'superadmin'].includes(req.user.role)
+    const userRole = (isAdmin && role && ['user', 'viewer', 'admin'].includes(role)) ? role : 'user'
+
     const passwordHash = await bcrypt.hash(password, 10)
     const result = await pool.query(
-      `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, 'user') RETURNING id, email, role, created_at`,
-      [email, passwordHash]
+      `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id, email, role, created_at`,
+      [email, passwordHash, userRole]
     )
     const user = result.rows[0]
 
@@ -890,6 +906,8 @@ function webhookIPFilter(allowedEnv) {
 }
 
 // ─── Авто-триггер доставки услуги после подтверждения платежа ─────
+// ⚠️ DEPRECATED — заменён на IntegrationService.processOrder() (см. FR-DELIVERY-01)
+// Оставлен для обратной совместимости, не вызывается из webhook.
 async function triggerProviderFulfillment(orderId) {
   try {
     const itemsRes = await pool.query('SELECT * FROM order_items WHERE order_id = $1', [orderId])
@@ -965,7 +983,17 @@ app.post('/api/payments/webhook', webhookIPFilter('YOOKASSA_WEBHOOK_IPS'), async
 })
 
 // FR-68: POST /api/payments/webhook/sberbank — уведомления от Сбербанка
-app.post('/api/payments/webhook/sberbank', webhookIPFilter('SBER_WEBHOOK_IPS'), async (req, res) => {
+// + Idempotency (FR-DELIVERY-06, уровень 1): mdOrder + operation → idempotency_key
+// + IntegrationService.processOrder() (FR-DELIVERY-01)
+app.post('/api/payments/webhook/sberbank',
+  webhookIPFilter('SBER_WEBHOOK_IPS'),
+  createIdempotencyMiddleware({
+    keySource: (req) => {
+      const body = req.body || {}
+      return body.mdOrder ? `${body.mdOrder}_${body.operation || 'unknown'}` : null
+    },
+  }),
+  async (req, res) => {
   try {
     const gateway = paymentGateways.sberbank
     if (!gateway) return res.status(200).json({ received: true })
@@ -982,18 +1010,45 @@ app.post('/api/payments/webhook/sberbank', webhookIPFilter('SBER_WEBHOOK_IPS'), 
       if (payRes.rows.length > 0) {
         const orderId = payRes.rows[0].order_id
 
+        // Idempotency: сохраняем ключ (если есть) в payments
+        if (req.idempotencyKey) {
+          await pool.query(
+            `UPDATE payments SET idempotency_key = $1 WHERE gateway_tx_id = $2 AND idempotency_key IS NULL`,
+            [req.idempotencyKey, result.transaction_id]
+          )
+        }
+
         // Обновляем заказ
-        await pool.query(
+        const { rowCount } = await pool.query(
           `UPDATE orders SET payment_status = 'paid', status = 'paid', updated_at = now() WHERE id = $1 AND payment_status = 'pending'`,
           [orderId]
         )
-        await pool.query(
-          `UPDATE payments SET status = 'paid' WHERE gateway_tx_id = $1`,
-          [result.transaction_id]
-        )
 
-        // E2E: автоматически запускаем доставку услуги провайдеру
-        triggerProviderFulfillment(orderId)
+        if (rowCount > 0) {
+          await pool.query(
+            `UPDATE payments SET status = 'paid' WHERE gateway_tx_id = $1`,
+            [result.transaction_id]
+          )
+
+          // FR-DELIVERY-01: доставка услуги через IntegrationService.processOrder()
+          const itemsRes = await pool.query(
+            'SELECT provider_code FROM order_items WHERE order_id = $1 AND provider_code IS NOT NULL LIMIT 1',
+            [orderId]
+          )
+
+          if (itemsRes.rows.length > 0) {
+            try {
+              const deliveryResult = await processOrder(orderId, {
+                pollingService,
+                alertService,
+              })
+              console.log(`[webhook/sberbank] Delivery started: order=${orderId} tx=${deliveryResult?.transaction_id}`)
+            } catch (deliveryErr) {
+              console.error(`[webhook/sberbank] Delivery failed for order ${orderId}:`, deliveryErr.message)
+              // FR-DELIVERY-07: алерт создаётся внутри processOrder
+            }
+          }
+        }
       }
     }
 
@@ -1696,6 +1751,47 @@ async function start() {
     await initProviders()
     console.log('[server] Провайдеры инициализированы')
     initScheduler()
+
+    // ─── Admin: список пользователей ────────────────────────
+    app.get('/api/users', requireRole('admin'), async (req, res) => {
+      try {
+        const { rows } = await pool.query(
+          'SELECT id, email, role, created_at FROM users ORDER BY created_at DESC'
+        )
+        res.json(rows)
+      } catch (err) {
+        res.status(500).json({ error: err.message })
+      }
+    })
+
+    // ─── Admin: изменить роль пользователя ─────────────────
+    app.patch('/api/users/:id', requireRole('admin'), async (req, res) => {
+      try {
+        const { role } = req.body
+        if (!['user', 'viewer', 'admin'].includes(role)) {
+          return res.status(400).json({ error: 'Недопустимая роль' })
+        }
+        const { rows } = await pool.query(
+          'UPDATE users SET role = $1 WHERE id = $2 AND role != $3 RETURNING id, email, role',
+          [role, req.params.id, 'superadmin']
+        )
+        res.json(rows[0] || { error: 'NOT_FOUND' })
+      } catch (err) {
+        res.status(500).json({ error: err.message })
+      }
+    })
+
+    // ─── Admin: список всех заказов ─────────────────────────
+    app.get('/api/orders', requireRole('admin'), async (req, res) => {
+      try {
+        const { rows } = await pool.query(
+          'SELECT * FROM orders ORDER BY created_at DESC LIMIT 100'
+        )
+        res.json(rows)
+      } catch (err) {
+        res.status(500).json({ error: err.message })
+      }
+    })
 
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 API Server running on http://0.0.0.0:${PORT}`)

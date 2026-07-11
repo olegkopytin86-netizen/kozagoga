@@ -10,7 +10,8 @@ import { calculatePrice, createOrder, getOrderDetail } from '../services/order/O
 import { processOrder } from '../services/integration/IntegrationService.js'
 import { resolveGateway } from '../../lib/gateways/index.js'
 
-export default function createOrdersV2Router(paymentGateways) {
+export default function createOrdersV2Router(paymentGateways, options = {}) {
+  const { pollingService, alertService } = options
   const router = Router()
   const pool = getPool()
 
@@ -71,11 +72,12 @@ export default function createOrdersV2Router(paymentGateways) {
 
         if (gateway) {
           const paymentResult = await gateway.createPayment({
-            orderId: order.id,
+            order_id: order.id,
             amount: parseFloat(order.total),
             currency: order.currency,
             description: `Заказ #${order.id.slice(0, 8)}`,
-            returnUrl: req.body.redirect_url,
+            return_url: req.body.redirect_url,
+            user: req.user,
           })
 
           // Сохраняем gateway_payment_id
@@ -200,16 +202,23 @@ export default function createOrdersV2Router(paymentGateways) {
       }
 
       if (payment_status === 'paid') {
-        await pool.query(
+        // Idempotency: обновляем только pending → paid
+        const { rowCount } = await pool.query(
           `UPDATE orders SET
             payment_status = 'paid',
             status = 'paid',
             paid_at = NOW(),
             gateway_status = 'paid',
             updated_at = NOW()
-          WHERE id = $1`,
+          WHERE id = $1 AND payment_status = 'pending'`,
           [order_id]
         )
+
+        if (rowCount === 0) {
+          // Уже обработан — игнорируем дубликат
+          console.log(`[webhook] Duplicate for order ${order_id}, skipping`)
+          return res.json({ received: true, duplicate: true })
+        }
 
         // История статусов
         await pool.query(
@@ -220,7 +229,7 @@ export default function createOrdersV2Router(paymentGateways) {
 
         // Запуск интеграции (sync для MVP)
         try {
-          await processOrder(order_id)
+          await processOrder(order_id, { pollingService, alertService })
         } catch (processErr) {
           console.error(`[webhook] processOrder error for ${order_id}:`, processErr)
         }

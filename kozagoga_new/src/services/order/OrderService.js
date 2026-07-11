@@ -9,7 +9,7 @@ import crypto from 'node:crypto'
  * Рассчитывает цену для выбранной услуги + региона + amount.
  */
 export async function calculatePrice(params, pool) {
-  const { product_id, service_id, region_id, amount } = params
+  const { product_id, service_id, region_id, amount } = await resolveSlugs(params, pool)
 
   // Проверка service
   const { rows: services } = await pool.query(
@@ -93,12 +93,14 @@ export async function createOrder(params, userId, pool) {
   const totalAmount = items.reduce((sum, i) => sum + i.total_price, 0)
   const currency = items[0]?.currency || 'RUB'
 
-  // 3. Создание в транзакции
-  const result = await pool.query('BEGIN')
+  // 3. Создание в транзакции (исправлено: client вместо pool)
+  const client = await pool.connect()
   try {
+    await client.query('BEGIN')
+
     // 3a. Создать заказ
     const idempKey = params.idempotency_key || crypto.randomUUID()
-    const { rows: orders } = await pool.query(
+    const { rows: orders } = await client.query(
       `INSERT INTO orders (
         user_id, status, total, currency, payment_status,
         user_email, idempotency_key, service_config_snapshot
@@ -119,7 +121,7 @@ export async function createOrder(params, userId, pool) {
 
     // 3b. Создать позиции заказа
     for (const item of items) {
-      const { rows: orderItems } = await pool.query(
+      const { rows: orderItems } = await client.query(
         `INSERT INTO order_items (
           order_id, product_id, product_name,
           service_id, service_name, region_id, region_name, region_code,
@@ -149,7 +151,7 @@ export async function createOrder(params, userId, pool) {
       // 3c. Сохранить поля ввода
       for (const input of item.inputs) {
         const sha256 = crypto.createHash('sha256').update(input.value).digest('hex')
-        await pool.query(
+        await client.query(
           `INSERT INTO order_item_inputs (
             order_item_id, field_key, field_label, field_type, value, value_sha256
           ) VALUES ($1,$2,$3,$4,$5,$6)`,
@@ -159,19 +161,21 @@ export async function createOrder(params, userId, pool) {
     }
 
     // 3d. Запись в историю статусов
-    await pool.query(
+    await client.query(
       `INSERT INTO order_status_history (order_id, to_status, changed_by)
        VALUES ($1, 'pending', 'system')`,
       [order.id]
     )
 
-    await pool.query('COMMIT')
+    await client.query('COMMIT')
 
     return { order, items: validation.items }
 
   } catch (err) {
-    await pool.query('ROLLBACK')
+    await client.query('ROLLBACK')
     throw err
+  } finally {
+    client.release()
   }
 }
 
@@ -194,6 +198,50 @@ export async function getOrderDetail(orderId, pool) {
   )
 
   return { ...order, items }
+}
+
+/**
+ * Резолвит slug → UUID для product, service, region.
+ * Если передан UUID — оставляет как есть.
+ */
+async function resolveSlugs(params, pool) {
+  const { product_id, service_id, region_id, amount } = params
+
+  // Поддержка 'slug' как синонима 'product_id' (фронтенд шлёт slug)
+  let resolvedProductId = product_id || params.slug
+  let resolvedServiceId = service_id
+  let resolvedRegionId = region_id
+
+  // Проверка: строка длиной 36 = UUID, иначе — slug
+  const isUUID = (v) => v && (v.length === 36 || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v))
+
+  if (resolvedProductId && !isUUID(resolvedProductId)) {
+    const { rows } = await pool.query('SELECT id FROM products WHERE slug = $1 LIMIT 1', [resolvedProductId])
+    resolvedProductId = rows.length > 0 ? rows[0].id : resolvedProductId
+  }
+
+  if (service_id && !isUUID(service_id)) {
+    const { rows } = await pool.query(
+      'SELECT id FROM product_services WHERE slug = $1 OR name = $1 LIMIT 1',
+      [service_id]
+    )
+    resolvedServiceId = rows.length > 0 ? rows[0].id : service_id
+  }
+
+  if (region_id && !isUUID(region_id)) {
+    const { rows } = await pool.query(
+      'SELECT id FROM service_regions WHERE region_code = $1 OR region_name = $1 LIMIT 1',
+      [region_id]
+    )
+    resolvedRegionId = rows.length > 0 ? rows[0].id : region_id
+  }
+
+  return {
+    product_id: resolvedProductId,
+    service_id: resolvedServiceId,
+    region_id: resolvedRegionId,
+    amount,
+  }
 }
 
 /**
