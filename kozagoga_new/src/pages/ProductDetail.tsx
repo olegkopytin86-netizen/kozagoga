@@ -202,19 +202,19 @@ export default function ProductDetail() {
 
               <Button
                 size="lg"
-                className="w-full gap-3 bg-[#21A038] text-white hover:bg-[#1a8a2e] shadow-lg text-base h-14"
+                className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:bg-transparent h-auto"
                 disabled={isProcessing}
                 onClick={() => handlePayment("sberpay")}
               >
                 {isProcessing && paymentMethod === "sberpay" ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto my-6" />
                 ) : (
-                  <Building2 className="h-6 w-6" />
+                  <img
+                    src="/assets/sberpay_wide.svg"
+                    alt="SberPay"
+                    className="block w-full h-auto"
+                  />
                 )}
-                <span className="flex flex-col items-start leading-tight">
-                  <span>SberPay</span>
-                  <span className="text-[11px] opacity-75">Оплата через СберБанк</span>
-                </span>
               </Button>
 
               <Button
@@ -224,7 +224,7 @@ export default function ProductDetail() {
                 onClick={() => handlePayment("sbp")}
               >
                 <img
-                  src="/images/products/sbp-button.webp"
+                  src="/assets/sbp_wide.svg"
                   alt="СБП"
                   className="block w-full h-auto"
                 />

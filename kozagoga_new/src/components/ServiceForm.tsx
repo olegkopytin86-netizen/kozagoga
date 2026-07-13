@@ -19,6 +19,7 @@ import { formatPrice } from "@/lib/utils"
 import { useAuth } from "@/contexts/AuthContext"
 import { getServices, validateRequisite, createOrder, processPayment, type ServiceField } from "@/lib/api"
 import SberPayButton from "@/components/payment/SberPayButton"
+import PaymentButton from "@/components/payment/PaymentButton"
 
 type PaymentMethod = "sberpay" | "sbp" | "card" | "wallet"
 
@@ -443,7 +444,9 @@ export default function ServiceForm({ product }: Props) {
           <SberPayButton selected={paymentMethod === "sberpay"} onClick={() => setPaymentMethod("sberpay")} />
           <button onClick={() => setPaymentMethod("sbp")}
             className={`rounded-xl border p-3 text-left transition-all text-sm ${paymentMethod === "sbp" ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:border-primary/30"}`}>
-            <div className="mb-1 text-xl">📱</div>
+            <div className="mb-1">
+              <img src="/assets/sbp_compact.svg" alt="СБП" className="h-8 w-auto" />
+            </div>
             <div className="text-xs font-medium">СБП</div>
             <div className="text-[10px] text-muted-foreground">Система быстрых платежей</div>
           </button>
@@ -469,15 +472,11 @@ export default function ServiceForm({ product }: Props) {
         </Button>
 
         {paymentMethod === "sberpay" ? (
-          <button onClick={handlePay}
+          <PaymentButton
+            type="sberpay"
+            onClick={handlePay}
             disabled={!amount || parseFloat(amount) < serviceInfo.min_amount}
-            style={{ backgroundColor: '#21A038' }}
-            className="flex flex-1 items-center justify-center gap-3 rounded-full py-2.5 text-base font-bold text-white shadow-md transition-all hover:brightness-110 hover:shadow-lg active:brightness-90 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/25">
-              <span className="text-[11px] font-bold text-white">С</span>
-            </div>
-            <span className="text-base font-bold tracking-wide">Pay</span>
-          </button>
+          />
         ) : (
           <Button className="flex-1 gap-2" onClick={handlePay}
             disabled={!amount || parseFloat(amount) < serviceInfo.min_amount}>

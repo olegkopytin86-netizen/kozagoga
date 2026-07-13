@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="200" viewBox="0 0 600 200">
+<rect width="600" height="200" fill="none"/>
+<rect x="16" y="20" width="568" height="160" rx="44" fill="#000" opacity=".16"/>
+<rect x="16" y="16" width="568" height="160" rx="44" fill="#21A038"/>
+<rect x="18" y="18" width="564" height="72" rx="44" fill="#fff" opacity=".07"/>
+<circle cx="162" cy="100" r="43" fill="none" stroke="#fff" stroke-width="9"/>
+<path d="M143 102 L160 119 L190 82" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M130 95 A43 43 0 0 1 192 75" fill="none" stroke="#21A038" stroke-width="13" stroke-linecap="round"/>
+<path d="M136 92 A43 43 0 0 1 188 78" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round"/>
+<text x="228" y="122" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="700">SberPay</text>
+</svg>

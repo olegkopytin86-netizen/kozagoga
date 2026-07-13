@@ -11,6 +11,7 @@ import { useCart } from "@/contexts/CartContext"
 import { useAuth } from "@/contexts/AuthContext"
 import { createOrder, processPayment } from "@/lib/api"
 import SberPayButton from "@/components/payment/SberPayButton"
+import PaymentButton from "@/components/payment/PaymentButton"
 import QrDisplay from "@/components/payment/QrDisplay"
 
 type PaymentMethod = "card" | "sbp" | "sberpay" | "wallet"
@@ -297,7 +298,9 @@ export default function Checkout() {
                           : "hover:border-primary/30"
                       }`}
                     >
-                      <div className="mb-1 text-2xl">📱</div>
+                      <div className="mb-1">
+                        <img src="/assets/sbp_compact.svg" alt="СБП" className="h-8 w-auto" />
+                      </div>
                       <div className="text-sm font-medium">СБП</div>
                       <div className="text-xs text-muted-foreground">Система быстрых платежей</div>
                     </button>
@@ -381,28 +384,12 @@ export default function Checkout() {
                   )}
 
                   {paymentMethod === "sberpay" ? (
-                    <button
+                    <PaymentButton
+                      type="sberpay"
                       onClick={handlePayment}
                       disabled={isProcessing}
-                      style={{ backgroundColor: '#21A038' }}
-                      className="flex w-full items-center justify-center gap-3 rounded-full py-4 text-lg font-bold text-white shadow-md transition-all hover:brightness-110 hover:shadow-lg active:brightness-90 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
-                    >
-                      {isProcessing ? (
-                        <>
-                          <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4 31.4" strokeLinecap="round" />
-                          </svg>
-                          Обработка...
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/25">
-                            <span className="text-xs font-bold text-white">С</span>
-                          </div>
-                          <span className="text-lg font-bold tracking-wide">Pay</span>
-                        </>
-                      )}
-                    </button>
+                      processing={isProcessing}
+                    />
                   ) : (
                     <Button
                       size="lg"
