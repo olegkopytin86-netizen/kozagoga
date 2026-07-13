@@ -6,6 +6,24 @@
 // response.amount — в копейках, конвертируем в рубли.
 
 import PaymentGateway from '../payment-gateway.js'
+import https from 'https'
+import fs from 'fs'
+import path from 'path'
+
+// ─── HTTPS Agent с российским корневым CA для API Сбера ──
+// Сертификат ecomift.sberbank.ru подписан Russian Trusted Root CA (Минцифры)
+// Этот CA не входит в стандартный bundle Node.js — добавляем вручную
+const SBER_CA_PATH = '/etc/ssl/certs/RussianTrustedRootCA.crt'
+let sberAgent = null
+try {
+  if (fs.existsSync(SBER_CA_PATH)) {
+    const ca = fs.readFileSync(SBER_CA_PATH)
+    sberAgent = new https.Agent({ ca, rejectUnauthorized: true })
+    console.log('[sberbank] ✅ Загружен Russian Trusted Root CA для TLS')
+  }
+} catch (err) {
+  console.warn('[sberbank] ⚠️ Не удалось загрузить CA:', err.message)
+}
 
 // ─── Маппинг errorCode → действие (по BRD 2.7.7) ────────
 const ERROR_MAP = {
@@ -71,36 +89,63 @@ export default class SberbankGateway extends PaymentGateway {
    * Аутентификация: userName + password в теле JSON
    */
   async _apiCall(method, params = {}) {
-    const url = `${this.baseUrl}/${method}`
+    const url = new URL(`${this.baseUrl}/${method}`)
 
     // Добавляем аутентификацию в тело запроса
     if (!this.login || !this.password) {
       throw new Error('[sberbank] SBER_LOGIN и SBER_PASSWORD должны быть в .env')
     }
+
+    // Тело: JSON. jsonParams передаётся как вложенный объект (не строка!).
+    // Пример: jsonParams: { qrType: 'DYNAMIC_QR_SBP', 'sbp.scenario': 'C2B' }
     const body = JSON.stringify({
       userName: this.login,
       password: this.password,
       ...params,
     })
 
-    const headers = {
-      'Content-Type': 'application/json',
-    }
+    // Используем https.request вместо fetch, т.к. fetch (undici) в Node.js
+    // игнорирует опцию agent с кастомным CA сертификатом
+    const data = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: url.pathname + url.search,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+        agent: sberAgent || undefined,
+      }
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body,
+      const req = https.request(options, (res) => {
+        let responseBody = ''
+        res.on('data', (chunk) => { responseBody += chunk })
+        res.on('end', () => {
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            reject(new Error(`[sberbank] HTTP ${res.statusCode} при вызове ${method}: ${responseBody.slice(0, 200)}`))
+            return
+          }
+          try {
+            const data = JSON.parse(responseBody)
+            const errorCode = String(data.errorCode || '0')
+            resolve({ data, errorCode })
+          } catch (e) {
+            reject(new Error(`[sberbank] Ошибка парсинга ответа: ${e.message}`))
+          }
+        })
+      })
+
+      req.on('error', (e) => {
+        reject(new Error(`[sberbank] ${e.message} (${e.cause?.code || e.code || 'unknown'})`))
+      })
+
+      req.write(body)
+      req.end()
     })
 
-    if (!response.ok) {
-      throw new Error(`[sberbank] HTTP ${response.status} при вызове ${method}`)
-    }
-
-    const data = await response.json()
-    const errorCode = String(data.errorCode || '0')
-
-    return { data, errorCode }
+    return data
   }
 
   /**
@@ -139,23 +184,11 @@ export default class SberbankGateway extends PaymentGateway {
     if (process.env.SBER_DEMO_MODE === 'true') {
       console.log(`[sberbank] 🧪 ДЕМО: создание платежа ${orderNumber} на сумму ${amount}`)
       await new Promise(r => setTimeout(r, 1500)) // имитация задержки
-      // Формируем параметры для диплинков по гайду Сбера
-      const bankInvoiceId = `demo-inv-${order_id}`.slice(0, 36)
-      const dlParams = `bankInvoiceId=${bankInvoiceId}&orderNumber=${orderNumber}`
 
       return {
-        redirect_url: return_url || this.returnUrl,
-        deep_links: [
-          // iOS — строгий порядок из гайда Сбера
-          `onlineios-app://sbolpay/invoicing/v2?${dlParams}`,
-          `startonline://sbolpay/invoicing/v2?${dlParams}`,
-          `onlineappmobile://sbolpay/invoicing/v2?${dlParams}`,
-          `budgetonline-ios://sbolpay/invoicing/v2?${dlParams}`,
-          `btripsexpenses://sbolpay/invoicing/v2?${dlParams}`,
-          `ios-app-smartonline://sbolpay/invoicing/v2?${dlParams}`,
-        ],
+        redirect_url: null,
         transaction_id: `demo-${order_id}`,
-        status: 'pending',
+        status: 'succeeded',
       }
     }
 
@@ -168,6 +201,13 @@ export default class SberbankGateway extends PaymentGateway {
       description: description || `Заказ #${order_id}`,
       pageView: payment_way === 'sberpay' ? 'MOBILE' : 'DESKTOP',
       sessionTimeoutSecs: this.sessionTimeout,
+    }
+
+    // Для СБП (QR) — передаём jsonParams (вложенный объект, не строка!)
+    // Пример: jsonParams: { qrType: 'DYNAMIC_QR_SBP', 'sbp.scenario': 'C2B' }
+    if (payment_way === 'sbp') {
+      params.pageView = 'MOBILE' // СБП QR — всегда мобильный вид
+      params.jsonParams = { qrType: 'DYNAMIC_QR_SBP', 'sbp.scenario': 'C2B' }
     }
 
     // Для двухстадийных платежей
@@ -185,8 +225,9 @@ export default class SberbankGateway extends PaymentGateway {
     // Если заказ уже существует — возвращаем что есть
     if (err?.existing) {
       const dlParams = `bankInvoiceId=${data.orderId || orderId}&orderNumber=${orderNumber}`
+      const existingRedirect = data.externalParams?.sbpPayload || data.formUrl
       return {
-        redirect_url: data.formUrl || null,
+        redirect_url: existingRedirect || null,
         deep_links: [
           `onlineios-app://sbolpay/invoicing/v2?${dlParams}`,
           `startonline://sbolpay/invoicing/v2?${dlParams}`,
@@ -220,8 +261,14 @@ export default class SberbankGateway extends PaymentGateway {
       `ios-app-smartonline://sbolpay/invoicing/v2?${dlParams}`
     )
 
+    // Для СБП — редирект на sbpPayload (QR-ссылка НСПК), не на formUrl
+    // Для SberPay/card — formUrl (страница оплаты Сбербанка)
+    const redirectUrl = payment_way === 'sbp'
+      ? data.externalParams?.sbpPayload || data.formUrl
+      : data.formUrl
+
     return {
-      redirect_url: data.formUrl,
+      redirect_url: redirectUrl,
       deep_links,
       transaction_id: data.orderId,
       status: 'pending',

@@ -18,38 +18,55 @@ export default function ProductDetail() {
   const [error, setError] = useState("")
   const [isSuccess, setIsSuccess] = useState(false)
 
-  const handleSberPayDeeplinks = (deepLinks: string[], fallbackUrl: string) => {
+  const handleSberPayDeeplinks = (deepLinks: string[], onFail: () => void) => {
+    if (!deepLinks || deepLinks.length === 0) {
+      onFail()
+      return
+    }
+
     const ua = navigator.userAgent
     const isIOS = /iPhone|iPad|iPod/i.test(ua)
     const isAndroid = /Android/i.test(ua)
 
     if (isIOS) {
-      // iOS: перебор диплинков по гайду Сбера
-      const tryLinks = (links: string[], idx: number) => {
-        if (idx >= links.length) {
-          window.location.href = "https://www.sberbank.ru/ru/person/payments/online_sberpay"
+      // iOS: перебор всех deep_links через location.href с 50ms
+      let idx = 0
+      let fallbackTimer: ReturnType<typeof setTimeout> | null = null
+
+      const tryNext = () => {
+        if (idx >= deepLinks.length) {
+          onFail()
           return
         }
-        window.location.href = links[idx]
-        setTimeout(() => tryLinks(links, idx + 1), 200)
+        window.location.href = deepLinks[idx]
+        idx++
+        fallbackTimer = setTimeout(tryNext, 50)
       }
-      tryLinks(deepLinks, 0)
+
+      const onVisibility = () => {
+        if (document.hidden && fallbackTimer) {
+          clearTimeout(fallbackTimer)
+          document.removeEventListener('visibilitychange', onVisibility)
+        }
+      }
+      document.addEventListener('visibilitychange', onVisibility)
+      tryNext()
     } else if (isAndroid) {
-      // Android: Intent → web fallback через таймаут
+      // Android: location.href + visibilitychange
       const timeout = setTimeout(() => {
-        window.location.href = fallbackUrl
+        onFail()
       }, 2500)
       const handleVisibility = () => {
         if (document.hidden) {
           clearTimeout(timeout)
-          document.removeEventListener("visibilitychange", handleVisibility)
+          document.removeEventListener('visibilitychange', handleVisibility)
         }
       }
-      document.addEventListener("visibilitychange", handleVisibility)
-      window.location.href = deepLinks[0] || fallbackUrl
+      document.addEventListener('visibilitychange', handleVisibility)
+      window.location.href = deepLinks[0]
     } else {
-      // Desktop → сразу веб-редирект
-      window.location.href = fallbackUrl
+      // Desktop: приложение Сбера недоступно
+      onFail()
     }
   }
 
@@ -71,7 +88,10 @@ export default function ProductDetail() {
 
       if (payment.redirect_url) {
         if (method === "sberpay" && payment.deep_links?.length > 0) {
-          handleSberPayDeeplinks(payment.deep_links, payment.redirect_url)
+          handleSberPayDeeplinks(payment.deep_links, () => {
+            setError('Не удалось найти приложение, попробуйте оплатить другим способом')
+            setIsProcessing(false)
+          })
           return
         }
         // Обычный редирект (карты, СБП)
@@ -81,9 +101,9 @@ export default function ProductDetail() {
 
       // Успех без редиректа
       setIsSuccess(true)
+      setIsProcessing(false)
     } catch (err: any) {
       setError(err.message || "Ошибка оплаты. Попробуйте снова.")
-    } finally {
       setIsProcessing(false)
     }
   }
@@ -204,7 +224,7 @@ export default function ProductDetail() {
                 onClick={() => handlePayment("sbp")}
               >
                 <img
-                  src="/assets/sbp_button_product_card_600x200.jpg"
+                  src="/images/products/sbp-button.webp"
                   alt="СБП"
                   className="block w-full h-auto"
                 />

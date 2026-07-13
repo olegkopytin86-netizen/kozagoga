@@ -97,6 +97,22 @@ const POSTER_GRADIENTS: Record<string, string> = {
 
 const DEFAULT_BG = "radial-gradient(ellipse 180% 70% at 50% 10%, rgba(0,148,255,0.40) 0%, transparent 65%), radial-gradient(ellipse 120% 80% at 50% 80%, rgba(79,70,229,0.35) 0%, transparent 60%), linear-gradient(145deg, #060B1A 0%, #0F1B3D 30%, #081326 65%, #060B1A 100%)"
 
+/** Маппинг старых id (из статического каталога) на новые DGoods slug */
+const SLUG_MAP: Record<string, string> = {
+  'playstation-network': 'playstation-network-card',
+  'sony-playstation-card': 'playstation-network-card',
+  'xbox-live': 'xbox-live-gift-card',
+  'appstore-itunes': 'app-store-itunes-gift-card',
+  'roblox-card-pay': 'roblox-payment-card',
+  'nintendo-eshop': 'nintendo-eshop-card',
+  'nintendo-online': 'nintendo-switch-online-membership',
+  'netflix-digital': 'netflix-digital-code',
+  'world-of-warcraft-time': 'world-of-warcraft-time-card',
+  'apex-legends': 'apex-legends-coins',
+  'apex-legends-xbox': 'apex-legends-coins',
+  'stalcraft': 'stalcraft-items',
+}
+
 export default function ProductCard({ product }: { product: GameProduct }) {
   const badge = product.badge
   const discount = badge?.startsWith("-") ? badge : null
@@ -110,7 +126,7 @@ export default function ProductCard({ product }: { product: GameProduct }) {
 
   return (
     <Link
-      to={`/product/${product.id}`}
+      to={`/product/${SLUG_MAP[product.id] || product.id}`}
       className="gamestore-card group"
       style={{ aspectRatio: "150 / 225" }}
     >

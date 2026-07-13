@@ -132,7 +132,7 @@ export default function createSupportRouter() {
 
   /** GET /api/admin/support/tickets — очередь тикетов */
   router.get('/admin/support/tickets', async (req, res) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Недостаточно прав' })
+    if (!['admin', 'superadmin'].includes(req.user?.role)) return res.status(403).json({ error: 'Недостаточно прав' })
     const { status, priority, limit = '50', offset = '0' } = req.query
     const conditions = []
     const params = []
@@ -160,7 +160,7 @@ export default function createSupportRouter() {
 
   /** POST /api/admin/support/tickets/:id/assign — назначить оператора */
   router.post('/admin/support/tickets/:id/assign', async (req, res) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Недостаточно прав' })
+    if (!['admin', 'superadmin'].includes(req.user?.role)) return res.status(403).json({ error: 'Недостаточно прав' })
     const { rows } = await pool.query(
       `UPDATE support_tickets SET assigned_to = $1, status = 'in_progress'
        WHERE id = $2 RETURNING *`,
@@ -171,7 +171,7 @@ export default function createSupportRouter() {
 
   /** PATCH /api/admin/support/tickets/:id/status — сменить статус */
   router.patch('/admin/support/tickets/:id/status', async (req, res) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Недостаточно прав' })
+    if (!['admin', 'superadmin'].includes(req.user?.role)) return res.status(403).json({ error: 'Недостаточно прав' })
     const { status } = req.body
     if (!status) return res.status(400).json({ error: 'status обязателен' })
     const { rows } = await pool.query(
@@ -183,7 +183,7 @@ export default function createSupportRouter() {
 
   /** POST /api/admin/support/tickets/:id/messages — ответ оператора */
   router.post('/admin/support/tickets/:id/messages', async (req, res) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Недостаточно прав' })
+    if (!['admin', 'superadmin'].includes(req.user?.role)) return res.status(403).json({ error: 'Недостаточно прав' })
     const { message, is_internal } = req.body
     if (!message) return res.status(400).json({ error: 'message обязателен' })
     const { rows } = await pool.query(
@@ -196,7 +196,7 @@ export default function createSupportRouter() {
 
   /** GET /api/admin/support/stats — статистика */
   router.get('/admin/support/stats', async (req, res) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Недостаточно прав' })
+    if (!['admin', 'superadmin'].includes(req.user?.role)) return res.status(403).json({ error: 'Недостаточно прав' })
     const { rows } = await pool.query(
       `SELECT
         COUNT(*) FILTER (WHERE status = 'open') AS open,

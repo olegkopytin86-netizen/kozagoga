@@ -21,6 +21,7 @@ import createLoyaltyRouter from './src/routes/loyalty.js'
 import createGiftsRouter from './src/routes/gifts.js'
 import createSupportRouter from './src/routes/support.js'
 import { initScheduler } from './src/services/scheduler.js'
+import createDGoodsRouter from './src/routes/dgoods.js'
 import createProductsRouter from './src/routes/products.js'
 import createCategoriesRouter from './src/routes/categories.js'
 
@@ -233,6 +234,7 @@ app.use('/api', createLoyaltyRouter())
 app.use('/api', createSupportRouter())
 app.use('/api/products', createProductsRouter())
 app.use('/api/categories', createCategoriesRouter())
+app.use('/api', createDGoodsRouter())
 
 // v2 API — услуги, регионы, динамические поля (Product Card Service Architecture)
 app.use('/api/v1/products', createProductsV2Router())
@@ -689,14 +691,37 @@ app.post('/api/orders', requireAuth, rateLimit(getRateLimits().orders || 30), as
         }
         const product = prodRes.rows[0]
         const quantity = item.quantity || 1
-        const itemTotal = parseFloat(product.price) * quantity
+
+        // Определяем цену: если указан variant_id — берём цену из варианта
+        let price
+        if (item.variant_id) {
+          const varRes = await client.query(
+            'SELECT price FROM product_variants WHERE id = $1 AND product_id = $2',
+            [item.variant_id, product.id]
+          )
+          if (varRes.rows.length === 0) {
+            throw new Error(`Вариант товара ${item.variant_id} не найден`)
+          }
+          price = parseFloat(varRes.rows[0].price)
+          if (!price || price <= 0) {
+            throw new Error('Некорректная цена варианта')
+          }
+        } else {
+          price = parseFloat(product.price)
+          if (!price || price <= 0) {
+            throw new Error('Некорректная цена товара')
+          }
+        }
+
+        const itemTotal = price * quantity
         total += itemTotal
 
         orderItemsData.push({
           product_id: product.id,
           product_name: product.name,
           quantity,
-          price: product.price,
+          price,
+          variant_id: item.variant_id || null,
           provider_code: product.provider_code,
           provider_service_id: product.provider_service_id
         })

@@ -42,7 +42,7 @@ export default function createProductsRouter() {
       let idx = 1
 
       if (category) {
-        conditions.push(`(c.slug = $${idx} OR c.id::text = $${idx})`)
+        conditions.push(`(c.slug = $${idx} OR c.id::text = $${idx} OR cp.slug = $${idx} OR cp.id::text = $${idx})`)
         params.push(category)
         idx++
       }
@@ -55,13 +55,33 @@ export default function createProductsRouter() {
         idx++
       }
       if (search) {
-        // PG FTS или fallback ILIKE
         conditions.push(`(
           p.search_vector @@ plainto_tsquery('russian', $${idx})
           OR p.name ILIKE $${idx+1}
         )`)
         params.push(search, `%${search}%`)
         idx += 2
+      }
+      // DGoods filters
+      if (req.query.region) {
+        conditions.push(`pv_dg.region = $${idx}`)
+        params.push(req.query.region)
+        idx++
+      }
+      if (req.query.publisher) {
+        conditions.push(`p.publisher = $${idx}`)
+        params.push(req.query.publisher)
+        idx++
+      }
+      if (req.query.min_price) {
+        conditions.push(`pv_dg.price >= $${idx}`)
+        params.push(parseFloat(req.query.min_price))
+        idx++
+      }
+      if (req.query.max_price) {
+        conditions.push(`pv_dg.price <= $${idx}`)
+        params.push(parseFloat(req.query.max_price))
+        idx++
       }
 
       const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : ''
@@ -81,7 +101,7 @@ export default function createProductsRouter() {
         : sort === 'newest' ? 'ORDER BY p.created_at DESC'
         : 'ORDER BY p.sort_order ASC, p.created_at DESC'
 
-      // Products with first variant price included
+      // Products with DGoods variants (region/denomination) or old-style variants
       const result = await readPool.query(
         `SELECT
           p.id, p.name, p.slug, p.short_description,
@@ -90,33 +110,77 @@ export default function createProductsRouter() {
           p.delivery_time, p.region, p.rating, p.review_count,
           p.is_featured, p.seller_name, p.seller_verified,
           p.product_type, p.delivery_type,
+          p.publisher,
           c.name AS category_name, c.slug AS category_slug,
-          -- variants summary
+          cp.name AS parent_category_name, cp.slug AS parent_category_slug,
+          -- min/avg цены из DGoods вариаций
+          MIN(pv_dg.price) FILTER (WHERE pv_dg.is_active) AS min_variant_price,
+          MAX(pv_dg.price) FILTER (WHERE pv_dg.is_active) AS max_variant_price,
+          -- номинал (denomination)
+          MIN(pv_dg.denomination) FILTER (WHERE pv_dg.is_active) AS min_denomination,
+          MAX(pv_dg.denomination) FILTER (WHERE pv_dg.is_active) AS max_denomination,
+          -- валюта номинала (берём первую активную)
+          (SELECT pv2.denom_currency FROM product_variants pv2 WHERE pv2.product_id = p.id AND pv2.is_active = true LIMIT 1) AS denom_currency,
+          -- количество активных вариаций
+          COUNT(pv_dg.id) FILTER (WHERE pv_dg.is_active) AS active_variants,
+          -- DGoods вариации (только активные)
           COALESCE(
             jsonb_agg(
               jsonb_build_object(
-                'id', pv.id,
-                'name', pv.name,
-                'price', pv.price,
-                'currency', pv.currency,
-                'old_price', pv.old_price
+                'id', pv_dg.id,
+                'region', pv_dg.region,
+                'denomination', pv_dg.denomination,
+                'denom_currency', pv_dg.denom_currency,
+                'price', pv_dg.price,
+                'old_price', pv_dg.old_price,
+                'is_active', pv_dg.is_active,
+                'in_stock', pv_dg.stock > 0
               )
-              ORDER BY pv.sort_order, pv.price
-            ) FILTER (WHERE pv.id IS NOT NULL),
+              ORDER BY pv_dg.region, pv_dg.denomination
+            ) FILTER (WHERE pv_dg.id IS NOT NULL AND pv_dg.is_active),
             '[]'::jsonb
           ) AS variants
         FROM products p
         LEFT JOIN categories c ON c.id = p.category_id
-        LEFT JOIN product_variants pv ON pv.product_id = p.id AND pv.is_active = true
+        LEFT JOIN categories cp ON cp.id = c.parent_id
+        LEFT JOIN product_variants pv_dg ON pv_dg.product_id = p.id
         ${where}
-        GROUP BY p.id, c.name, c.slug
+        GROUP BY p.id, c.name, c.slug, cp.name, cp.slug
         ${orderSQL}
         LIMIT $${idx++} OFFSET $${idx++}`,
         [...params, limitNum, offset]
       )
 
+      // Добавляем pricing блок для каждого товара
+      const items = result.rows.map(row => {
+        const activeVariants = parseInt(row.active_variants || '0')
+        const minPrice = row.min_variant_price ? parseFloat(row.min_variant_price) : null
+        const maxPrice = row.max_variant_price ? parseFloat(row.max_variant_price) : null
+        const minDenom = row.min_denomination ? parseFloat(row.min_denomination) : null
+        const maxDenom = row.max_denomination ? parseFloat(row.max_denomination) : null
+        
+        const item = { ...row }
+        
+        // Для DGoods продуктов строим pricing
+        if (row.publisher && activeVariants > 0) {
+          item.pricing = {
+            type: 'fixed',
+            nominal: minDenom,
+            nominalCurrency: row.denom_currency || 'RUB',
+            price: minPrice,
+            priceCurrency: 'RUB',
+            minNominal: activeVariants > 1 ? minDenom : null,
+            maxNominal: activeVariants > 1 ? maxDenom : null,
+            minPrice: activeVariants > 1 ? minPrice : null,
+            maxPrice: activeVariants > 1 ? maxPrice : null,
+          }
+        }
+        
+        return item
+      })
+
       const data = {
-        items: result.rows,
+        items,
         pagination: {
           page: pageNum,
           limit: limitNum,
@@ -166,9 +230,11 @@ export default function createProductsRouter() {
     try {
       const { slug } = req.params
       const result = await readPool.query(
-        `SELECT p.*, c.name AS category_name, c.slug AS category_slug
+        `SELECT p.*, c.name AS category_name, c.slug AS category_slug,
+                cp.name AS parent_category_name, cp.slug AS parent_category_slug
          FROM products p
          LEFT JOIN categories c ON c.id = p.category_id
+         LEFT JOIN categories cp ON cp.id = c.parent_id
          WHERE (p.slug = $1 OR p.id::text = $1) AND p.is_active = true
          LIMIT 1`,
         [slug]
@@ -180,15 +246,52 @@ export default function createProductsRouter() {
 
       const product = result.rows[0]
 
-      // Get variants
+      // Get DGoods variants (с регионом и номиналом)
       const { rows: variants } = await readPool.query(
-        `SELECT * FROM product_variants
-         WHERE product_id = $1 AND is_active = true
-         ORDER BY sort_order, price`,
+        `SELECT id, product_id, region, denomination, denom_currency,
+                price, old_price, cost_price, is_active, stock > 0 AS in_stock,
+                external_data
+         FROM product_variants
+         WHERE product_id = $1
+         ORDER BY region, denomination`,
         [product.id]
       )
+      
+      // Если это DGoods продукт — свои метаданные
+      if (product.provider_code === 'dgoods') {
+        // Группируем вариации по регионам
+        const regions = [...new Set(variants.filter(v => v.is_active).map(v => v.region))]
+        product.delivery_info = { type: 'digital_code', description: 'Код придёт на email после оплаты' }
+        product.available_regions = regions
+      }
 
       product.variants = variants
+      
+      // Pricing для DGoods
+      const activeVariants = variants.filter(v => v.is_active)
+      if (activeVariants.length > 0) {
+        const prices = activeVariants.map(v => parseFloat(v.price)).filter(p => !isNaN(p))
+        const denoms = activeVariants.map(v => parseFloat(v.denomination)).filter(d => !isNaN(d))
+        const minPrice = Math.min(...prices)
+        const maxPrice = Math.max(...prices)
+        const minDenom = Math.min(...denoms)
+        const maxDenom = Math.max(...denoms)
+        
+        product.pricing = {
+          type: 'fixed',
+          nominal: minDenom,
+          nominalCurrency: activeVariants[0].denom_currency || 'RUB',
+          price: minPrice,
+          priceCurrency: 'RUB',
+          minNominal: activeVariants.length > 1 ? minDenom : null,
+          maxNominal: activeVariants.length > 1 ? maxDenom : null,
+          minPrice: activeVariants.length > 1 ? minPrice : null,
+          maxPrice: activeVariants.length > 1 ? maxPrice : null,
+        }
+      }
+      
+      product.min_price = activeVariants.length > 0 ? Math.min(...activeVariants.map(v => parseFloat(v.price))) : null
+      product.max_price = activeVariants.length > 0 ? Math.max(...activeVariants.map(v => parseFloat(v.price))) : null
 
       // Get related products (same category)
       if (product.category_id) {
@@ -207,6 +310,73 @@ export default function createProductsRouter() {
     } catch (err) {
       console.error('GET /api/products/:slug error:', err)
       res.status(500).json({ error: 'Ошибка получения товара' })
+    }
+  })
+
+  // ─── POST /api/products — создать товар (admin) ──────────
+  router.post('/', async (req, res) => {
+    try {
+      if (!req.user || !['admin', 'superadmin'].includes(req.user.role)) {
+        return res.status(403).json({ error: 'FORBIDDEN' })
+      }
+      const { name, slug, description, price, image_url, category_id, is_active, product_type } = req.body
+      if (!name || !slug || price === undefined) {
+        return res.status(400).json({ error: 'name, slug, price обязательны' })
+      }
+      const { rows } = await pool.query(
+        `INSERT INTO products (name, slug, description, price, image_url, category_id, is_active, product_type)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [name, slug, description || '', parseFloat(price), image_url || null, category_id || null, is_active !== false, product_type || 'digital']
+      )
+      res.status(201).json(rows[0])
+    } catch (err) {
+      if (err.code === '23505') return res.status(409).json({ error: 'DUPLICATE_SLUG' })
+      console.error('POST /api/products error:', err)
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // ─── PATCH /api/products/:id — обновить товар (admin) ─────
+  router.patch('/:id', async (req, res) => {
+    try {
+      if (!req.user || !['admin', 'superadmin'].includes(req.user.role)) {
+        return res.status(403).json({ error: 'FORBIDDEN' })
+      }
+      const fields = ['name', 'slug', 'description', 'price', 'old_price', 'image_url', 'category_id', 'is_active', 'product_type', 'rating', 'stock', 'delivery_type']
+      const updates = []
+      const values = []
+      let idx = 1
+      for (const f of fields) {
+        if (req.body[f] !== undefined) {
+          updates.push(`${f} = $${idx}`)
+          values.push(f === 'price' || f === 'old_price' ? parseFloat(req.body[f]) : req.body[f])
+          idx++
+        }
+      }
+      if (updates.length === 0) return res.status(400).json({ error: 'NO_FIELDS' })
+      values.push(req.params.id)
+      const { rows } = await pool.query(
+        `UPDATE products SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`,
+        values
+      )
+      res.json(rows[0] || { error: 'NOT_FOUND' })
+    } catch (err) {
+      console.error('PATCH /api/products error:', err)
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // ─── DELETE /api/products/:id — удалить товар (admin) ─────
+  router.delete('/:id', async (req, res) => {
+    try {
+      if (!req.user || !['admin', 'superadmin'].includes(req.user.role)) {
+        return res.status(403).json({ error: 'FORBIDDEN' })
+      }
+      await pool.query('DELETE FROM products WHERE id = $1', [req.params.id])
+      res.json({ deleted: true })
+    } catch (err) {
+      console.error('DELETE /api/products error:', err)
+      res.status(500).json({ error: err.message })
     }
   })
 

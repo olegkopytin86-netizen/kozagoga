@@ -1,11 +1,14 @@
 import { createBrowserRouter } from 'react-router-dom'
 import App from './App'
+import { AuthProvider } from './contexts/AuthContext'
+import AdminShell from './pages/admin/AdminShell'
 import Home from './pages/Home'
 import About from './pages/About'
 import FAQ from './pages/FAQ'
 import Contacts from './pages/Contacts'
 import Catalog from './pages/Catalog'
 import ProductDetail from './pages/ProductDetail'
+import ProductDetailV2 from './pages/ProductDetailV2'
 import SearchResults from './pages/SearchResults'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -25,6 +28,7 @@ import NotFound from './pages/NotFound'
 import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute'
 
 export const router = createBrowserRouter([
+  // ─── Основной сайт (с Header/Footer) ──────────────────
   {
     path: '/',
     element: <App />,
@@ -34,7 +38,7 @@ export const router = createBrowserRouter([
       { path: 'faq', element: <FAQ /> },
       { path: 'contacts', element: <Contacts /> },
       { path: 'catalog', element: <Catalog /> },
-      { path: 'product/:slug', element: <ProductDetail /> },
+      { path: 'product/:slug', element: <ProductDetailV2 /> },
       { path: 'search', element: <SearchResults /> },
       { path: 'login', element: <Login /> },
       { path: 'register', element: <Register /> },
@@ -75,12 +79,26 @@ export const router = createBrowserRouter([
         path: 'profile',
         element: <ProtectedRoute><Profile /></ProtectedRoute>,
       },
-      {
-        path: 'admin',
-        element: <AdminRoute><AdminDashboard /></AdminRoute>,
-      },
       { path: 'ciframall', element: <CifraMallPreview /> },
       { path: '*', element: <NotFound /> },
+    ],
+  },
+
+  // ─── Админка (БЕЗ Header/Footer, отдельная зона) ────
+  {
+    path: '/admin',
+    element: <AuthProvider><AdminRoute><AdminShell /></AdminRoute></AuthProvider>,
+    children: [
+      { index: true, element: <AdminDashboard /> },
+    ],
+  },
+
+  // ─── /tech/admin — ведёт на ту же админку ────────────
+  {
+    path: '/tech/admin',
+    element: <AuthProvider><AdminRoute><AdminShell /></AdminRoute></AuthProvider>,
+    children: [
+      { index: true, element: <AdminDashboard /> },
     ],
   },
 ])

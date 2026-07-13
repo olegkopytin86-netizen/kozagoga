@@ -34,7 +34,7 @@ export async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 // ─── Orders ────────────────────────────────────────────
-export async function createOrder(items: { product_id: string; quantity: number }[], payment_method?: string) {
+export async function createOrder(items: { product_id: string; variant_id?: string; quantity: number }[], payment_method?: string) {
   const res = await fetch(`${API_BASE}/api/orders`, {
     method: 'POST',
     headers: headers(),
