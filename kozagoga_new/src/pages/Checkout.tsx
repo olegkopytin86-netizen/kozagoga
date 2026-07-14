@@ -11,7 +11,6 @@ import { useCart } from "@/contexts/CartContext"
 import { useAuth } from "@/contexts/AuthContext"
 import { createOrder, processPayment } from "@/lib/api"
 import SberPayButton from "@/components/payment/SberPayButton"
-import PaymentButton from "@/components/payment/PaymentButton"
 import QrDisplay from "@/components/payment/QrDisplay"
 
 type PaymentMethod = "card" | "sbp" | "sberpay" | "wallet"
@@ -299,7 +298,7 @@ export default function Checkout() {
                       }`}
                     >
                       <div className="mb-1">
-                        <img src="/assets/sbp_compact.svg" alt="СБП" className="h-8 w-auto" />
+                        <img src="/assets/sbp_button.png" alt="СБП" className="h-8 w-auto" />
                       </div>
                       <div className="text-sm font-medium">СБП</div>
                       <div className="text-xs text-muted-foreground">Система быстрых платежей</div>
@@ -384,12 +383,23 @@ export default function Checkout() {
                   )}
 
                   {paymentMethod === "sberpay" ? (
-                    <PaymentButton
-                      type="sberpay"
+                    <button
                       onClick={handlePayment}
                       disabled={isProcessing}
-                      processing={isProcessing}
-                    />
+                      className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isProcessing ? (
+                        <div className="flex h-12 items-center justify-center">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : (
+                        <img
+                          src="/assets/sberpay_c8f6f567.png"
+                          alt="SberPay"
+                          className="w-full h-auto"
+                        />
+                      )}
+                    </button>
                   ) : (
                     <Button
                       size="lg"

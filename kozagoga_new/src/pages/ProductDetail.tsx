@@ -210,7 +210,7 @@ export default function ProductDetail() {
                   <Loader2 className="h-5 w-5 animate-spin mx-auto my-6" />
                 ) : (
                   <img
-                    src="/assets/sberpay_wide.svg"
+                    src="/assets/sberpay_c8f6f567.png"
                     alt="SberPay"
                     className="block w-full h-auto"
                   />
@@ -224,7 +224,7 @@ export default function ProductDetail() {
                 onClick={() => handlePayment("sbp")}
               >
                 <img
-                  src="/assets/sbp_wide.svg"
+                  src="/assets/sbp_button.png"
                   alt="СБП"
                   className="block w-full h-auto"
                 />

@@ -19,7 +19,6 @@ import { formatPrice } from "@/lib/utils"
 import { useAuth } from "@/contexts/AuthContext"
 import { getServices, validateRequisite, createOrder, processPayment, type ServiceField } from "@/lib/api"
 import SberPayButton from "@/components/payment/SberPayButton"
-import PaymentButton from "@/components/payment/PaymentButton"
 
 type PaymentMethod = "sberpay" | "sbp" | "card" | "wallet"
 
@@ -445,7 +444,7 @@ export default function ServiceForm({ product }: Props) {
           <button onClick={() => setPaymentMethod("sbp")}
             className={`rounded-xl border p-3 text-left transition-all text-sm ${paymentMethod === "sbp" ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:border-primary/30"}`}>
             <div className="mb-1">
-              <img src="/assets/sbp_compact.svg" alt="СБП" className="h-8 w-auto" />
+              <img src="/assets/sbp_button.png" alt="СБП" className="h-8 w-auto" />
             </div>
             <div className="text-xs font-medium">СБП</div>
             <div className="text-[10px] text-muted-foreground">Система быстрых платежей</div>
@@ -472,11 +471,16 @@ export default function ServiceForm({ product }: Props) {
         </Button>
 
         {paymentMethod === "sberpay" ? (
-          <PaymentButton
-            type="sberpay"
-            onClick={handlePay}
+          <button onClick={handlePay}
             disabled={!amount || parseFloat(amount) < serviceInfo.min_amount}
-          />
+            className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <img
+              src="/assets/sberpay_c8f6f567.png"
+              alt="SberPay"
+              className="w-full h-auto"
+            />
+          </button>
         ) : (
           <Button className="flex-1 gap-2" onClick={handlePay}
             disabled={!amount || parseFloat(amount) < serviceInfo.min_amount}>

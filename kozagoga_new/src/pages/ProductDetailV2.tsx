@@ -14,7 +14,6 @@ import { getFlagUrl, getFlagEmoji, REGION_NAME } from '@/lib/flags'
 import { createOrder, processPayment } from '@/lib/api'
 import { formatMoney, formatNominal } from '@/lib/format'
 import QrDisplay from '@/components/payment/QrDisplay'
-import PaymentButton from '@/components/payment/PaymentButton'
 import type { ProductDTO, ProductVariant } from '@/types/product'
 
 type PaymentMethod = 'sberpay' | 'sbp'
@@ -413,21 +412,37 @@ export default function ProductDetailV2() {
               </div>
 
               <div className="space-y-2 w-full sm:w-64">
-                <PaymentButton
-                  type="sberpay"
+                <button
+                  disabled={isProcessing}
                   onClick={() => handlePayment('sberpay')}
-                  disabled={isProcessing}
-                  processing={isProcessing && paymentMethod === 'sberpay'}
-                  variant="wide"
-                />
+                  className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 hover:opacity-90 transition-opacity"
+                >
+                  {isProcessing && paymentMethod === 'sberpay' ? (
+                    <Loader2 className="h-5 w-5 animate-spin mx-auto my-6" />
+                  ) : (
+                    <img
+                      src="/assets/sberpay_c8f6f567.png"
+                      alt="SberPay"
+                      className="w-full h-auto"
+                    />
+                  )}
+                </button>
 
-                <PaymentButton
-                  type="sbp"
-                  onClick={() => handlePayment('sbp')}
+                <button
                   disabled={isProcessing}
-                  processing={isProcessing && paymentMethod === 'sbp'}
-                  variant="wide"
-                />
+                  onClick={() => handlePayment('sbp')}
+                  className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 hover:opacity-90 transition-opacity"
+                >
+                  {isProcessing && paymentMethod === 'sbp' ? (
+                    <Loader2 className="h-5 w-5 animate-spin mx-auto my-6" />
+                  ) : (
+                    <img
+                      src="/assets/sbp_button.png"
+                      alt="СБП"
+                      className="w-full h-auto"
+                    />
+                  )}
+                </button>
               </div>
             </div>
 
