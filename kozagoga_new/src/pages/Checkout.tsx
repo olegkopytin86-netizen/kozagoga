@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { ShoppingCart, ArrowLeft, Trash2, Minus, Plus, Zap, ShoppingBag, CreditCard, Wallet as WalletIcon, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { formatPrice } from "@/lib/utils"
 import { useCart } from "@/contexts/CartContext"
 import { useAuth } from "@/contexts/AuthContext"
 import { createOrder, processPayment } from "@/lib/api"
+import { initiateSberPay, checkSberPayStep } from "@/lib/sberpay"
 import SberPayButton from "@/components/payment/SberPayButton"
 import QrDisplay from "@/components/payment/QrDisplay"
 
@@ -29,6 +30,11 @@ export default function Checkout() {
   const [isSuccess, setIsSuccess] = useState(false)
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null)
   const [qrData, setQrData] = useState<{ payload: string; orderId: string } | null>(null)
+
+  // Проверка шага sberpay при загрузке страницы (перебор диплинков)
+  useEffect(() => {
+    checkSberPayStep()
+  }, [])
 
   const applyPromo = () => {
     setPromoError("")
@@ -68,48 +74,13 @@ export default function Checkout() {
         const isIOS = /iPhone|iPad|iPod/i.test(ua)
         const isAndroid = /Android/i.test(ua)
 
-        // Для СберПэй — перебор диплинков
+        // Для СберПэй — перебор диплинков (по спецификации SberPay mWeb2app)
         if (payment.deep_links && payment.deep_links.length > 0 && paymentMethod === 'sberpay') {
-          const deepLinks = payment.deep_links
-
-          if (isIOS) {
-            // iOS: перебор всех deep_links через location.href с 50ms
-            let idx = 0
-            let fallbackTimer: ReturnType<typeof setTimeout> | null = null
-
-            const tryNext = () => {
-              if (idx >= deepLinks.length) {
-                setError('Не удалось найти приложение СберПэй на вашем устройстве')
-                setIsProcessing(false)
-                return
-              }
-              window.location.href = deepLinks[idx]
-              idx++
-              fallbackTimer = setTimeout(tryNext, 50)
-            }
-
-            const onVisibility = () => {
-              if (document.hidden && fallbackTimer) {
-                clearTimeout(fallbackTimer)
-                document.removeEventListener('visibilitychange', onVisibility)
-              }
-            }
-            document.addEventListener('visibilitychange', onVisibility)
-            tryNext()
-          } else if (isAndroid) {
-            // Android: location.href + visibilitychange
-            const timeout = setTimeout(() => {
-              setError('Не удалось найти приложение СберПэй на вашем устройстве')
-              setIsProcessing(false)
-            }, 2500)
-            const handleVisibility = () => {
-              if (document.hidden) {
-                clearTimeout(timeout)
-                document.removeEventListener('visibilitychange', handleVisibility)
-              }
-            }
-            document.addEventListener('visibilitychange', handleVisibility)
-            window.location.href = deepLinks[0]
+          if (isIOS || isAndroid) {
+            // iOS: 6 фиксированных deep link схем
+            // Android: дефолтная попытка + фолбек
+            // clearMessage + редирект на свою страницу скрывает алерт Safari
+            initiateSberPay(payment.deep_links)
           } else {
             // Desktop: показываем QR-код (ссылка на форму оплаты Сбера)
             setQrData({ payload: payment.redirect_url, orderId: createdOrderId || '' })

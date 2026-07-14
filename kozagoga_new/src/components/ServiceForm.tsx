@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label"
 import { formatPrice } from "@/lib/utils"
 import { useAuth } from "@/contexts/AuthContext"
 import { getServices, validateRequisite, createOrder, processPayment, type ServiceField } from "@/lib/api"
+import { initiateSberPay, checkSberPayStep } from "@/lib/sberpay"
 import SberPayButton from "@/components/payment/SberPayButton"
 
 type PaymentMethod = "sberpay" | "sbp" | "card" | "wallet"
@@ -89,62 +90,25 @@ export default function ServiceForm({ product }: Props) {
     startWaiting(confirmId)
   }, [searchParams])
 
-  // ─── Цепочка диплинков: ?dlStep=N ─────────────────────
+  // ─── SberPay: проверка шага при загрузке страницы ───
   useEffect(() => {
-    const stepStr = searchParams.get('dlStep')
-    const savedRaw = sessionStorage.getItem('sber_deeplinks')
-    if (!stepStr || !savedRaw) {
-      if (stepStr) {
-        const url = new URL(window.location.href)
-        url.searchParams.delete('dlStep')
-        window.history.replaceState({}, '', url.toString())
+    checkSberPayStep()
+  }, [])
+
+  // ─── Совместимость со старой цепочкой (?dlStep) ───
+  useEffect(() => {
+    const dlStep = searchParams.get('dlStep')
+    if (dlStep !== null) {
+      const savedRaw = sessionStorage.getItem('sber_deeplinks')
+      if (savedRaw) {
+        const saved = JSON.parse(savedRaw)
+        if (saved.deepLinks?.length > 0) {
+          initiateSberPay(saved.deepLinks)
+        }
       }
-      return
-    }
-
-    const saved = JSON.parse(savedRaw)
-    const step = parseInt(stepStr, 10)
-
-    if (step >= saved.deepLinks.length) {
-      // Все 6 шагов пройдены — приложение не открылось
-      sessionStorage.removeItem('sber_deeplinks')
       const url = new URL(window.location.href)
       url.searchParams.delete('dlStep')
       window.history.replaceState({}, '', url.toString())
-      // Показываем сообщение + режим ожидания
-      setOrderId(saved.orderId)
-      setPaymentStatus('no_app')
-      startWaiting(saved.orderId)
-      return
-    }
-
-    let cancelled = false
-    let timerId: ReturnType<typeof setTimeout> | null = null
-
-    const onBlur = () => {
-      cancelled = true
-      if (timerId) clearTimeout(timerId)
-      // Приложение открылось — переходим в ожидание
-      sessionStorage.removeItem('sber_deeplinks')
-      const url = new URL(window.location.href)
-      url.searchParams.delete('dlStep')
-      url.searchParams.set('paymentConfirm', saved.orderId)
-      window.location.href = url.toString()
-    }
-    window.addEventListener('blur', onBlur)
-
-    window.location.href = saved.deepLinks[step]
-
-    timerId = setTimeout(() => {
-      if (cancelled) return
-      const url = new URL(window.location.href)
-      url.searchParams.set('dlStep', String(step + 1))
-      window.location.href = url.toString()
-    }, 50)
-
-    return () => {
-      window.removeEventListener('blur', onBlur)
-      if (timerId) clearTimeout(timerId)
     }
   }, [searchParams])
 
@@ -269,18 +233,14 @@ export default function ServiceForm({ product }: Props) {
         return
       }
 
-      // Mobile — цепочка диплинков
+      // Mobile — перебор диплинков по спецификации SberPay mWeb2app
       if (payment.deep_links && payment.deep_links.length > 0) {
         const ua = navigator.userAgent
         if (/iPhone|iPad|iPod/i.test(ua) || /Android/i.test(ua)) {
-          sessionStorage.setItem('sber_deeplinks', JSON.stringify({
-            deepLinks: payment.deep_links,
-            redirectUrl: payment.redirect_url,
-            orderId: order.id,
-          }))
-          const url = new URL(window.location.href)
-          url.searchParams.set('dlStep', '0')
-          window.location.href = url.toString()
+          // Сохраняем orderId для обработки после возврата
+          sessionStorage.setItem('sberpay_service_orderId', order.id)
+          // Запускаем перебор фиксированных схем из документации
+          initiateSberPay(payment.deep_links)
           return
         }
       }
