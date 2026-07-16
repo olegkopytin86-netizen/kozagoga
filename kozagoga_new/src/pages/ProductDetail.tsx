@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Link, useParams, useNavigate } from "react-router-dom"
 import { ChevronLeft, Star, Building2, Smartphone, CreditCard, Shield, Loader2, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { popularProducts } from "@/data/products"
 import { createOrder, processPayment } from "@/lib/api"
-import { initiateSberPay, checkSberPayStep } from "@/lib/sberpay"
 
 type PaymentMethod = "sberpay" | "sbp" | "card"
 
@@ -19,11 +18,6 @@ export default function ProductDetail() {
   const [error, setError] = useState("")
   const [isSuccess, setIsSuccess] = useState(false)
 
-  // Проверка шага sberpay при загрузке страницы (перебор диплинков)
-  useEffect(() => {
-    checkSberPayStep()
-  }, [])
-
   const handleSberPayDeeplinks = (deepLinks: string[], onFail: () => void) => {
     if (!deepLinks || deepLinks.length === 0) {
       onFail()
@@ -35,12 +29,41 @@ export default function ProductDetail() {
     const isAndroid = /Android/i.test(ua)
 
     if (isIOS) {
-      // iOS: 6 фиксированных deep link схем (строгий порядок из документации)
-      // Параметры банковского счёта извлекаются из deep_links ответа API
-      initiateSberPay(deepLinks)
+      // iOS: перебор всех deep_links через location.href с 50ms
+      let idx = 0
+      let fallbackTimer: ReturnType<typeof setTimeout> | null = null
+
+      const tryNext = () => {
+        if (idx >= deepLinks.length) {
+          onFail()
+          return
+        }
+        window.location.href = deepLinks[idx]
+        idx++
+        fallbackTimer = setTimeout(tryNext, 50)
+      }
+
+      const onVisibility = () => {
+        if (document.hidden && fallbackTimer) {
+          clearTimeout(fallbackTimer)
+          document.removeEventListener('visibilitychange', onVisibility)
+        }
+      }
+      document.addEventListener('visibilitychange', onVisibility)
+      tryNext()
     } else if (isAndroid) {
-      // Android: дефолтная попытка + фолбек
-      initiateSberPay(deepLinks)
+      // Android: location.href + visibilitychange
+      const timeout = setTimeout(() => {
+        onFail()
+      }, 2500)
+      const handleVisibility = () => {
+        if (document.hidden) {
+          clearTimeout(timeout)
+          document.removeEventListener('visibilitychange', handleVisibility)
+        }
+      }
+      document.addEventListener('visibilitychange', handleVisibility)
+      window.location.href = deepLinks[0]
     } else {
       // Desktop: приложение Сбера недоступно
       onFail()

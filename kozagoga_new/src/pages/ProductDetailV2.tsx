@@ -13,7 +13,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { getFlagUrl, getFlagEmoji, REGION_NAME } from '@/lib/flags'
 import { createOrder, processPayment } from '@/lib/api'
 import { formatMoney, formatNominal } from '@/lib/format'
-import { initiateSberPay, checkSberPayStep } from '@/lib/sberpay'
 import QrDisplay from '@/components/payment/QrDisplay'
 import type { ProductDTO, ProductVariant } from '@/types/product'
 
@@ -84,11 +83,6 @@ export default function ProductDetailV2() {
     'stalcraft': 'stalcraft-items',
   }
 
-  // Проверка шага sberpay при загрузке страницы (перебор диплинков)
-  useEffect(() => {
-    checkSberPayStep()
-  }, [])
-
   useEffect(() => {
     if (!slug) return
     setLoading(true)
@@ -155,16 +149,53 @@ export default function ProductDetailV2() {
     }
 
     const ua = navigator.userAgent
-    const isDesktop = !/iPhone|iPad|iPod|Android/i.test(ua)
+    const isIOS = /iPhone|iPad|iPod/i.test(ua)
+    const isAndroid = /Android/i.test(ua)
 
-    if (isDesktop) {
+    if (isIOS) {
+      // iOS: перебор всех deep_links через location.href с 50ms интервалом
+      // Safari может показать ошибку, но setTimeout(50ms) продолжает перебор
+      let idx = 0
+      let fallbackTimer: ReturnType<typeof setTimeout> | null = null
+
+      const tryNext = () => {
+        if (idx >= deepLinks.length) {
+          // Все перебраны — приложение не найдено
+          onFail()
+          return
+        }
+        window.location.href = deepLinks[idx]
+        idx++
+        fallbackTimer = setTimeout(tryNext, 50)
+      }
+
+      const onVisibility = () => {
+        if (document.hidden && fallbackTimer) {
+          clearTimeout(fallbackTimer)
+          document.removeEventListener('visibilitychange', onVisibility)
+        }
+      }
+      document.addEventListener('visibilitychange', onVisibility)
+      tryNext()
+    } else if (isAndroid) {
+      // Android: location.href + visibilitychange (2.5s таймаут)
+      const timeout = setTimeout(() => {
+        onFail()
+      }, 2500)
+      const handleVisibility = () => {
+        if (document.hidden) {
+          clearTimeout(timeout)
+          document.removeEventListener('visibilitychange', handleVisibility)
+        }
+      }
+      document.addEventListener('visibilitychange', handleVisibility)
+      window.location.href = deepLinks[0]
+    } else {
       // Desktop: показываем QR-код (ссылка на форму оплаты Сбера)
+      // Этот метод вызывается только из handlePayment, где есть createdOrderId
+      // qrData устанавливается внутри handlePayment до вызова этой функции
       onFail()
-      return
     }
-
-    // iOS и Android: строгий перебор фиксированных схем из документации
-    initiateSberPay(deepLinks)
   }
 
   const handlePayment = async (method: PaymentMethod) => {
