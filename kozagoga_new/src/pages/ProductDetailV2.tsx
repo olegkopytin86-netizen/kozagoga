@@ -384,7 +384,7 @@ export default function ProductDetailV2() {
                 <button
                   disabled={isProcessing}
                   onClick={() => handlePayment('sberpay')}
-                  className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:bg-transparent h-auto"
+                  className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:opacity-90 transition-opacity"
                 >
                   {isProcessing && paymentMethod === 'sberpay' ? (
                     <Loader2 className="h-5 w-5 animate-spin mx-auto my-6" />
@@ -392,7 +392,7 @@ export default function ProductDetailV2() {
                     <img
                       src="/assets/sberpay_gradient_a2657e8d.png"
                       alt="SberPay"
-                      className="w-full h-auto"
+                      className="block w-full h-auto"
                     />
                   )}
                 </button>
@@ -400,15 +400,15 @@ export default function ProductDetailV2() {
                 <button
                   disabled={isProcessing}
                   onClick={() => handlePayment('sbp')}
-                  className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:bg-transparent h-auto"
+                  className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:opacity-90 transition-opacity"
                 >
                   {isProcessing && paymentMethod === 'sbp' ? (
                     <Loader2 className="h-5 w-5 animate-spin mx-auto my-6" />
                   ) : (
                     <img
-                      src="/assets/sbp_button.png"
+                      src="/assets/sbp_v4.png"
                       alt="СБП"
-                      className="w-full h-auto"
+                      className="block w-full h-auto"
                     />
                   )}
                 </button>
