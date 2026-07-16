@@ -196,15 +196,19 @@ export default function ProductDetail() {
 
               <Button
                 size="lg"
-                className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:bg-transparent h-auto shadow-none"
+                className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:bg-transparent h-auto"
                 disabled={isProcessing}
                 onClick={() => handlePayment("sbp")}
               >
-                <img
-                  src="/assets/sbp_button.png"
-                  alt="СБП"
-                  className="block w-full h-auto"
-                />
+                {isProcessing && paymentMethod === "sbp" ? (
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto my-6" />
+                ) : (
+                  <img
+                    src="/assets/sbp_button.png"
+                    alt="СБП"
+                    className="block w-full h-auto"
+                  />
+                )}
               </Button>
 
               <Button
