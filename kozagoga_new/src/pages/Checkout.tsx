@@ -250,7 +250,7 @@ export default function Checkout() {
               </Card>
 
               {/* Способ оплаты */}
-              <Card>
+              <Card className="bg-transparent">
                 <CardContent className="p-4">
                   <h2 className="mb-4 text-lg font-semibold">Способ оплаты</h2>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
