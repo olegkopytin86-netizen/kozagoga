@@ -129,7 +129,7 @@ export default function ProductDetail() {
         </Link>
 
         {/* Карточка товара */}
-        <div className="overflow-hidden rounded-2xl bg-card shadow-2xl">
+        <div className="overflow-hidden rounded-2xl bg-transparent shadow-2xl">
           {/* Header */}
           <div className="relative flex flex-col items-center bg-gradient-to-br from-gray-800 to-gray-900 px-6 pb-6 pt-12">
             <img
