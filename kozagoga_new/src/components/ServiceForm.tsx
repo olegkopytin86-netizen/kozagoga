@@ -436,7 +436,7 @@ export default function ServiceForm({ product }: Props) {
             className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <img
-              src="/assets/sberpay_c8f6f567.png"
+              src="/assets/sberpay_gradient_a2657e8d.png"
               alt="SberPay"
               className="w-full h-auto"
             />

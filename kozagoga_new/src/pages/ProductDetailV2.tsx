@@ -390,7 +390,7 @@ export default function ProductDetailV2() {
                     <Loader2 className="h-5 w-5 animate-spin mx-auto my-6" />
                   ) : (
                     <img
-                      src="/assets/sberpay_c8f6f567.png"
+                      src="/assets/sberpay_gradient_a2657e8d.png"
                       alt="SberPay"
                       className="w-full h-auto"
                     />

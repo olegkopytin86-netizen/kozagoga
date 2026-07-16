@@ -365,7 +365,7 @@ export default function Checkout() {
                         </div>
                       ) : (
                         <img
-                          src="/assets/sberpay_c8f6f567.png"
+                          src="/assets/sberpay_gradient_a2657e8d.png"
                           alt="SberPay"
                           className="w-full h-auto"
                         />

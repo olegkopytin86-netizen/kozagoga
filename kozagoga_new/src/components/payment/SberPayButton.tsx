@@ -18,7 +18,7 @@ export default function PayButton({ selected, onClick }: PayButtonProps) {
     >
       <div className="mb-1">
         <img
-          src="/assets/sberpay_c8f6f567.png"
+          src="/assets/sberpay_gradient_a2657e8d.png"
           alt="SberPay"
           className="h-10 w-auto"
         />
