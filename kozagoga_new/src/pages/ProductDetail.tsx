@@ -196,7 +196,7 @@ export default function ProductDetail() {
 
               <Button
                 size="lg"
-                className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:bg-transparent"
+                className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:bg-transparent h-auto shadow-none"
                 disabled={isProcessing}
                 onClick={() => handlePayment("sbp")}
               >
