@@ -57,7 +57,7 @@ export default function Header() {
       >
         <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
           <div className="flex h-14 sm:h-[90px] lg:h-[130px] items-center justify-between relative">
-            {/* ─── Левая часть: CifraMall logo (персонаж скрыт, потом отладим) ─── */}
+            {/* ─── Левая часть: CifraMall логотип (текст) ─── */}
             <Link to="/" className="flex items-center gap-2 sm:gap-5 shrink-0 group">
               <div className="flex flex-col leading-none">
                 <span className="text-xl sm:text-[32px] lg:text-[56px] font-bold tracking-tight leading-none">

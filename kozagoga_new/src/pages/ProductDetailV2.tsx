@@ -394,7 +394,7 @@ export default function ProductDetailV2() {
 
         {/* ═══ Выбранный вариант — цена и оплата ═══ */}
         {selectedVariant && (
-          <div className="bg-transparent rounded-2xl p-6 mb-8">
+          <div className="bg-gray-900/50 rounded-2xl p-6 mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">
@@ -415,15 +415,15 @@ export default function ProductDetailV2() {
                 <button
                   disabled={isProcessing}
                   onClick={() => handlePayment('sberpay')}
-                  className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:opacity-90 transition-opacity"
+                  className="w-full block overflow-hidden rounded-lg border-none bg-gray-900 p-0 hover:opacity-90 transition-opacity"
                 >
                   {isProcessing && paymentMethod === 'sberpay' ? (
                     <Loader2 className="h-5 w-5 animate-spin mx-auto my-6" />
                   ) : (
                     <img
-                      src="/assets/sberpay_gradient_a2657e8d.png"
+                      src="/assets/sberpay_btn.png?v=2"
                       alt="SberPay"
-                      className="block w-full h-auto"
+                      className="w-full h-auto"
                     />
                   )}
                 </button>
@@ -431,15 +431,15 @@ export default function ProductDetailV2() {
                 <button
                   disabled={isProcessing}
                   onClick={() => handlePayment('sbp')}
-                  className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:opacity-90 transition-opacity"
+                  className="w-full block overflow-hidden rounded-lg border-none bg-gray-900 p-0 hover:opacity-90 transition-opacity"
                 >
                   {isProcessing && paymentMethod === 'sbp' ? (
                     <Loader2 className="h-5 w-5 animate-spin mx-auto my-6" />
                   ) : (
                     <img
-                      src="/assets/sbp_v4.png"
+                      src="/assets/sbp_btn.png?v=2"
                       alt="СБП"
-                      className="block w-full h-auto"
+                      className="w-full h-auto"
                     />
                   )}
                 </button>

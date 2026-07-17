@@ -444,7 +444,7 @@ export default function ServiceForm({ product }: Props) {
           <button onClick={() => setPaymentMethod("sbp")}
             className={`rounded-xl border p-3 text-left transition-all text-sm ${paymentMethod === "sbp" ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:border-primary/30"}`}>
             <div className="mb-1">
-              <img src="/assets/sbp_button.png" alt="СБП" className="h-8 w-auto" />
+              <img src="/assets/sbp_btn.png?v=2" alt="СБП" className="h-8 w-auto" />
             </div>
             <div className="text-xs font-medium">СБП</div>
             <div className="text-[10px] text-muted-foreground">Система быстрых платежей</div>
@@ -476,7 +476,7 @@ export default function ServiceForm({ product }: Props) {
             className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <img
-              src="/assets/sberpay_gradient_a2657e8d.png"
+              src="/assets/sberpay_btn.png?v=2"
               alt="SberPay"
               className="w-full h-auto"
             />

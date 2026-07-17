@@ -152,7 +152,7 @@ export default function ProductDetail() {
         </Link>
 
         {/* Карточка товара */}
-        <div className="overflow-hidden rounded-2xl bg-transparent shadow-2xl">
+        <div className="overflow-hidden rounded-2xl bg-card shadow-2xl">
           {/* Header */}
           <div className="relative flex flex-col items-center bg-gradient-to-br from-gray-800 to-gray-900 px-6 pb-6 pt-12">
             <img
@@ -202,7 +202,7 @@ export default function ProductDetail() {
 
               <Button
                 size="lg"
-                className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:bg-transparent h-auto"
+                className="w-full block overflow-hidden rounded-lg border-none bg-gray-900 p-0 m-0 hover:bg-gray-900 h-auto"
                 disabled={isProcessing}
                 onClick={() => handlePayment("sberpay")}
               >
@@ -210,7 +210,7 @@ export default function ProductDetail() {
                   <Loader2 className="h-5 w-5 animate-spin mx-auto my-6" />
                 ) : (
                   <img
-                    src="/assets/sberpay_gradient_a2657e8d.png"
+                    src="/assets/sberpay_btn.png?v=2"
                     alt="SberPay"
                     className="block w-full h-auto"
                   />
@@ -219,19 +219,15 @@ export default function ProductDetail() {
 
               <Button
                 size="lg"
-                className="w-full block overflow-hidden rounded-lg border-none bg-transparent p-0 m-0 hover:bg-transparent h-auto"
+                className="w-full block overflow-hidden rounded-lg border-none bg-gray-900 p-0 m-0 hover:bg-gray-900"
                 disabled={isProcessing}
                 onClick={() => handlePayment("sbp")}
               >
-                {isProcessing && paymentMethod === "sbp" ? (
-                  <Loader2 className="h-5 w-5 animate-spin mx-auto my-6" />
-                ) : (
-                  <img
-                    src="/assets/sbp_button.png"
-                    alt="СБП"
-                    className="block w-full h-auto"
-                  />
-                )}
+                <img
+                  src="/assets/sbp_btn.png?v=2"
+                  alt="СБП"
+                  className="block w-full h-auto"
+                />
               </Button>
 
               <Button
